@@ -93,8 +93,8 @@ color: cyan
 
 個人設定 `<config-path>` が無いときは「個人設定なし」として扱い、既存の参加プロジェクトは 0 件とする。
 
-ファイルの読み書きの手段: このセッションから直接読み書きできるパスは `Read`／`Write` を使う。Cowork で `<config-path>`・`<root>`・`<workdir>` がメンバーの PC の接続フォルダにあるときは `mcp__remote-devices__device_bash` で読み書きする（接続フォルダは `$HOME/mnt/<フォルダ名>` に見える。`device_bash` の `~` はセッション側のホームで PC のホームではないため、`~/.act/config.yaml` ではなく渡された `<config-path>` を読み替えて読む）。書いた `01_local-state.md` が渡された `<workdir>` の中にあることを確かめる。どちらの手段でも読めないファイルは「読めなかった」として `## 警告` に書き、経路の判定に必要なら中止にする。
+最初に `Skill` ツールで `act-core:local-files` を読む。ファイルの読み書き（`<config-path>`・`<root>/.act/project.yaml`・`<workdir>`）はそれに従う。個人設定は `~/.act/config.yaml` ではなく渡された `<config-path>` を読む。書いたことを確かめるファイルは `01_local-state.md`。読めないファイルは「読めなかった」として `## 警告` に書き、経路の判定に必要なら中止にする。
 
 # 使用するスキル
 
-なし（この係の判断はすべて本定義に書いてある）。
+- `act-core:local-files` — 設定ファイルと作業フォルダの読み書きの手段（Cowork の接続フォルダの扱いを含む）と、書いた位置の確かめ方。作業の最初に `Skill` ツールで読む。

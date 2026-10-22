@@ -15,7 +15,7 @@ argument-hint: "[コマンド名や状況]"
 | `/act-core:setup [プロジェクト名] [共有フォルダのパス] [保存先のURL]` | 初めて使うとき、新しいプロジェクトを始める・参加するとき、既存の Notion ページを ACT 用にするとき、プラグインを更新した後 | 個人設定 `~/.act/config.yaml` にプロジェクトを 1 件追加し、保存先（Notion の DB 一式など）を新規作成・取り込み・更新する。書く前に 2 回の確認フォームで承認を取る |
 | `/act-core:help [コマンド名や状況]` | 使い方が分からないとき | この案内を表示する |
 
-`act-core:store-protocol` と `act-core:write-plan` は、ほかのスキルとエージェントが読む規約で、直接呼ぶものではない。
+`act-core:store-protocol`、`act-core:write-plan`、`act-core:local-files` は、ほかのスキルとエージェントが読む規約で、直接呼ぶものではない。
 
 ## 初めて使うときの流れ
 

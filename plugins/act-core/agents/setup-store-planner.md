@@ -26,7 +26,7 @@ C0 初期設定の変更計画を作る。`act-core:store-protocol` に従って
 - `inputs-path`: `02_inputs.yaml` の絶対パス。使うキーは `route`（経路）、`root`、`project_name`、`project_key`、`roles`、`client`、`store_type`（保存先の種類。アダプタの選択に使う）、`store_location`（保存先の場所。`inspect` の `location` に使う）、`shared_choice`（任意。共通 DB の候補から選ばれたもの。あれば `plan` に渡す）。`roles`・`store_type`・`store_location` のどれかが無いときは `ERROR:` を返す。
 - `workdir`: 作業フォルダの絶対パス
 
-ファイルの読み書きの手段: このセッションから直接読み書きできるパスは `Read`／`Write` を使う。Cowork で `<local-state-path>`・`<inputs-path>`・`<workdir>` がメンバーの PC の接続フォルダにあるとき（メインは PC 上の絶対パスを渡す）は `mcp__remote-devices__device_bash` で読み書きする（接続フォルダは `$HOME/mnt/<フォルダ名>` に見えるので、渡されたパスを読み替える。`device_bash` の `~` はセッション側のホームで PC のホームではない）。書いた `03_setup-plan.md`・`03_setup-plan.json` が渡された `<workdir>` の中にあることを確かめる。どちらの手段でも入力が読めない、または計画を `<workdir>` に書けないときは `ERROR:` を返す。
+ファイルの読み書き（`<local-state-path>`・`<inputs-path>`・`<workdir>`）は `act-core:local-files` に従う。書いたことを確かめるファイルは `03_setup-plan.md`・`03_setup-plan.json`。入力が読めない、または計画を `<workdir>` に書けないときは `ERROR:` を返す。
 
 ## 出力
 
@@ -111,7 +111,7 @@ C0 初期設定の変更計画を作る。`act-core:store-protocol` に従って
 
 # 作業手順
 
-1. `Skill` ツールで `act-core:store-protocol` と `act-core:write-plan` を読む。
+1. `Skill` ツールで `act-core:store-protocol`・`act-core:write-plan`・`act-core:local-files` を読む。
 2. `<local-state-path>` と `<inputs-path>` を読み、経路と役割から「中止の判定」の最初の条件を確かめる。該当すれば、アダプタを呼ばずに中止の `03_setup-plan.md`（`## 概要` に `判定: 中止`・理由・次にすべきこと、`## 確認項目`・`## 計画の詳細` は空、`## 警告` は該当が無ければ「なし」）と、`items` が空の `03_setup-plan.json` を書いて手順 8 へ進む。
 3. `act-core:store-protocol` に従い、点検するアダプタ（「モードの判定」の定義）ごとに `describe` と `inspect` を呼ぶ（`inspect` の `location` は `02_inputs.yaml` の `store_location`、localfs は `root`。どちらにも `project_key`・`project_name` を渡す）。
 4. 「止まった移行の扱い」と「モードの判定」で経路とモードを決める。中止に当たれば手順 2 と同じ形で中止の計画を書いて手順 8 へ進む。
@@ -124,3 +124,4 @@ C0 初期設定の変更計画を作る。`act-core:store-protocol` に従って
 
 - `act-core:store-protocol` — アダプタの選び方、操作（`describe`・`inspect`・`plan`・`query`／`get`・`check_permission`）の呼び出し形式、正準エラーの扱い。作業の最初に `Skill` ツールで読む。
 - `act-core:write-plan` — 書き込み計画の項目の形、確信度の付け方、確認フォームに出す選択肢の形。作業の最初に `Skill` ツールで読む。
+- `act-core:local-files` — 入力ファイルと作業フォルダの読み書きの手段（Cowork の接続フォルダの扱いを含む）と、書いた位置の確かめ方。作業の最初に `Skill` ツールで読む。

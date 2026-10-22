@@ -36,7 +36,7 @@ color: red
 - `<inputs-path>`: `root`（`project.yaml` の場所 `<root>/.act/project.yaml`）、`project_key`（個人設定の該当プロジェクトの特定）、`store_location`（段 0 の `inspect` の `location`）
 - `04_approved-plan.json` の `items` の各要素: `item_id`（`03_setup-plan.json` の項目と突き合わせる）、`decision`、`override`
 
-ファイルの読み書きの手段: このセッションから直接読み書きできるパスは `Read`／`Write` を使う。Cowork で `<config-path>`・`<root>`・`<workdir>` がメンバーの PC の接続フォルダにあるときは `mcp__remote-devices__device_bash` で読み書きする（接続フォルダは `$HOME/mnt/<フォルダ名>` に見える。`device_bash` の `~` はセッション側のホームで PC のホームではない）。書いた設定ファイル・`05_apply-log.jsonl`・`06_apply-result.md` が渡されたパス（接続フォルダの中）にあることを確かめる。どちらの手段でも書けなければ、その段で止めて `## 警告` に書く。
+ファイルの読み書き（`<config-path>`・`<root>`・`<workdir>` の下）は `act-core:local-files` に従う。書いたことを確かめるファイルは、個人設定 `<config-path>`、`<root>/.act/project.yaml`、`05_apply-log.jsonl`、`06_apply-result.md`。書けなければ、その段で止めて `## 警告` に書く。
 
 ## 出力
 
@@ -84,7 +84,7 @@ color: red
 
 # 作業手順
 
-1. `Skill` ツールで `act-core:store-protocol` を読む。
+1. `Skill` ツールで `act-core:store-protocol` と `act-core:local-files` を読む。
 2. `plan-json-path`・`approved-plan-path`・`inputs-path` を読み、採用された項目を抜き出す。`<workdir>/05_apply-log.jsonl` があれば読み、成功済み・既適用の項目を除く。ワークフロー設定の項目が採用されていれば、`act-core` 同梱の `defaults/README.md` も読む（段 5 の登録の形の取得元）。
 3. 段 0〜段 6 の順で適用し、1 項目ごとにログへ追記する（ログの `step` は段の番号）。段 0〜6 の意味は `/act-core:setup` の `### 03_setup-plan.json の形` に従う。ある段で「止める」に当たれば、そこで適用を打ち切り、手順 4（`06_apply-result.md` の作成）へ進む。各段でこのエージェントが行うことと止める条件は次のとおり（詳細は判断基準の該当規則）。
    0. 書く予定のアダプタごとに `inspect`（読み取りのみ）を呼び、`workspace` を照合する。保存先には何も書かない。食い違い・照合できないときは止める。
@@ -103,3 +103,4 @@ color: red
 # 使用するスキル
 
 - `act-core:store-protocol` — 保存先の種類からアダプタを選ぶ規則、`inspect`・`apply`・`create`・`query`・`get`・`check_permission` の呼び出し形式、正準エラーの扱い。作業の最初に `Skill` ツールで読む。
+- `act-core:local-files` — 個人設定・`project.yaml`・作業フォルダの読み書きの手段（Cowork の接続フォルダの扱いを含む）と、書いた位置の確かめ方。作業の最初に `Skill` ツールで読む。

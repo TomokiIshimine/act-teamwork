@@ -8,7 +8,7 @@ description: |
   <example>
   変更計画フォームでプロジェクトキー・クライアント・保存先の場所が直され、メインが 02_inputs.yaml を上書きしたあと、同じ引数で再び起動して計画を作り直す。
   </example>
-model: sonnet
+model: opus
 color: blue
 ---
 

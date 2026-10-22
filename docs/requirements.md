@@ -2,7 +2,7 @@
 
 - 作成日: 2026-10-22
 - 対象: ACTモデル（Agentic, Context-driven Teamwork）を Claude 上で運用するためのプラグイン群
-- 前提資料: `act-model-detailed.md`（ACTモデル詳細解説）、`act-model.html`、ポンチ絵「AI主体で描くACTモデル」
+- 前提資料: [ACTモデル詳細解説](act-model/act-model-detailed.md)、[act-model.html](act-model/act-model.html)、[ポンチ絵](act-model/AI主体で描くACTモデル.png)
 - 状態: ドラフト。**§9 の論点**はユーザー確認待ち。
 
 ---

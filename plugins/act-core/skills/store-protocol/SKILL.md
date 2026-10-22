@@ -51,7 +51,7 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
 | --- | --- | --- |
 | `describe` | なし | `adapter`、`schema_version`（このアダプタが目標とする版）、`types`（対応する型）、`ops`（対応する操作）、`permission_check`（権限の確認方法） |
 | `inspect` | `location`、`project_key`、`project_name`（下記） | 下記 |
-| `plan` | `inspection`（`inspect` の結果）、`target_schema_version`、`mode`（`新規作成`／`取り込み`／`更新`）、`mapping`（任意）、`shared_choice`（共通 DB の候補が複数あったときに選んだもの） | `changes`、`mapping_proposal`、`manual_steps`（下記） |
+| `plan` | `inspection`（`inspect` の結果）、`target_schema_version`、`mode`（`新規作成`／`取り込み`／`更新`）、`mapping`（任意）、`shared_choice`（共通 DB の候補が複数あったとき、または印の無い共通 DB の取り込みの候補があったときに選んだもの。候補の場所か、取り込まずに新しく作る `new`） | `changes`、`mapping_proposal`、`manual_steps`、`prefix_conflicts`、`prefix_unchecked`（下記） |
 | `apply` | `changes`（承認された変更だけ）、`mapping`（確定した対応づけ。取り込み・更新のとき）、`run_id`（実行の識別子。呼び出し元の作業フォルダ名など）、`project_key` | `results`（変更 ID ごとに `success`／`failed`／`already_applied`）、`schema_version`（適用後の版）、`store_ids`（型ごとの DB 識別子） |
 | `clear_migration` | `run_id`（止まった実行の識別子） | なし。止まった移行の印を外す（下記「移行中の印」） |
 | `query` | `type`、`filter`（属性の条件: 状態・担当・期間・キーワード・関連 ID・名前・別名） | エンティティの配列（`attributes` だけ。`narrative` は含めない） |
@@ -91,16 +91,20 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
     - `store_ids`: 型ごとの識別子。見つからなければ空
     - `recorded_schema_version`: 共通の保存先に記録された版。無ければ `null`
     - `candidates`: 起点の近くで見つからず、離れた場所で 2 つ以上見つかったときの候補（それぞれの場所と `store_ids`）。1 つに決まったときは空
+    - `adoptable`: ACT の印の無い既存の共通の保存先を、アダプタのスキーマと照合して取り込めそうなもの（取り込みの候補）。各要素は `location`、`store_ids`（型ごと）、`match`（型ごとの照合結果 `一致`／`近い` と、足りないもの・食い違うもの・根拠）。印のある共通の保存先が見つかったとき、または共通の保存先を持たないアダプタでは空
   - `databases`: 見つかった DB の配列。各要素は `role`（推定した型。分からなければ `null`）、`name`、`id`、`properties`（名前と型）、`template_headings`、`scope`（`project`／`shared`／`unknown`）
   - `migration`: `{ "in_progress": 真偽, "since": 日時, "run_id": 識別子 }`（下記「移行中の印」）
   - `workspace`: 接続先の識別子（Notion ならワークスペース ID、localfs なら `root`）
   - `user`: 接続しているアカウントの `name`・`email`・`id`（分かる範囲で）
+  - `id_prefixes`（任意）: 保存先の中で一意でなければならない ID の接頭辞を持つアダプタ（Notion）が、使用済みの接頭辞を返す。各要素は `prefix`（読めなければ `null`）、`database`、`name`、`url`、`marked`（ACT の印があるか）、`type`、`source`（どこから読んだか）。あわせて `id_prefix_check`（`checked`・`unknown`・`complete`）を返す。接頭辞の一意性の制約が無いアダプタは省略する
 
 ### `plan` の出力
 
-- `changes`: 変更の配列。各要素は `change_id`、`target`（対象 DB）、`category`（`追加`／`変換`／`削除`／`手作業`）、`description`、`affected_pages`（影響するページ数）、`samples`（変換の見本。変換のときだけ）。
-- `mapping_proposal`: 取り込みのときの対応づけ案。各要素は `canonical`（正準項目）、`existing`（既存プロパティ名。無ければ `null`）、`treatment`（`そのまま使う`／`名前を変えて使う`／`新規に追加する`／`ACT では使わない`）、`basis`（根拠）。
+- `changes`: 変更の配列。各要素は `change_id`、`target`（対象 DB）、`category`（`追加`／`変換`／`削除`／`手作業`）、`description`、`affected_pages`（影響するページ数）、`samples`（変換の見本。変換のときだけ）、`adopt`（印の無い既存の共通の保存先を取り込む変更のときだけ。`{ "type", "database" }`）。
+- `mapping_proposal`: 取り込みのときの対応づけ案。各要素は `type`（型）、`canonical`（正準項目）、`existing`（既存プロパティ名。無ければ `null`）、`treatment`（`そのまま使う`／`名前を変えて使う`／`新規に追加する`／`ACT では使わない`）、`basis`（根拠）。
 - `manual_steps`: API で設定できず人の作業が要る手順（行単位の権限ルールなど）。
+- `prefix_conflicts`: 作ろうとした保存先の ID の接頭辞が使用済みで、その作成を `changes` から外したもの。各要素は `prefix`、`type`、`used_by`（使っている保存先の `database`・`name`・`url`・`marked`・`type`）、`resolution`（`adopt`＝その保存先を取り込めば解消／`change_key`＝プロジェクトキーを変えれば解消／`manual`＝人が保存先側で直すまで解消しない）。無ければ空。
+- `prefix_unchecked`: 接頭辞を読めなかった保存先（空の DB など）。作るときに初めて衝突が分かることがある。無ければ空。
 - 削除は既定で `changes` に入れず、`旧_` を付けて残す変更にする。人が追加したプロパティ・見出しは定義に無くても残す。
 
 ### `apply` の約束
@@ -136,7 +140,7 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
 | --- | --- | --- |
 | `permission_denied` | 保存先が操作を拒否した | 失敗にせず、その項目を飛ばして警告にする。書き込みなら「提案」や「判断依頼」への切り替えを検討する |
 | `not_found` | 対象が無い | 失敗として扱う |
-| `conflict` | 移行中・同時更新などで今は書けない | 失敗として扱い、時間をおいて再実行するよう案内する |
+| `conflict` | 移行中・同時更新などで今は書けない。または ID の接頭辞が使用済みで作れない | 失敗として扱い、時間をおいて再実行するよう案内する。`message` が ID の接頭辞の使用済みを示すときは、再実行では解消しないので、`message` の使用元を直すよう案内する |
 | `unsupported` | アダプタがその型・操作に対応していない | 失敗として扱い、対応するアダプタの版を案内する |
 | `invalid_request` | 入力の形が規約に合わない | 呼び出し元の不具合。失敗として扱う |
 

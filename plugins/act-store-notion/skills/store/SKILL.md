@@ -37,10 +37,30 @@ Notion の構成（DB・プロパティ・本文テンプレート・ACT の印�
 3. **共通側**: 共通 DB（🏢・📁・🏷・🧠）を次の順で探す。
    1. ルートの子の DB で `[ACT]` 印の `type` が共通の型のもの。
    2. 見つからなければ `notion-search` で `[ACT] type=` を手がかりに同じワークスペースを探す。1 組だけ見つかればそれを使う。2 組以上（別の ACT ルート）なら、選ばずに `candidates` に並べる。
+   3. 印のある共通 DB が 1 つも無ければ、印の無い既存の共通 DB を探し、`adoptable` に載せる（取り込みの候補。`store_ids` には入れない）。探す範囲は、ルートの子の DB と、`notion-search` で共通 DB の名前（絵文字を除いた「クライアント」「プロジェクト」「タグ」「ナレッジ」）を検索して見つかった DB。見つかった DB を親ページごとにまとめ、各 DB を下の「共通 DB の照合」で照合する。共通の型が 1 つ以上「一致」か「近い」になった親ページを 1 組の候補とする。
    - `recorded_schema_version`: 共通 DB の説明文の印の版（4 つで違えば最小）。無ければ `null`
-4. 印の無い DB は、名前とプロパティを `schema-v1.md` と比べて `role` を推定し、`scope` を `unknown` として `databases` に載せる（取り込みの材料）。
-5. `migration`: トップページの `ACT 設定` の `migrating`・`migrating_since`・`run_id`。共通 DB だけが移行中なら、説明文の 1 行目末尾の ` migrating <run_id> <日時>` から読む。
+   - `adoptable`: 候補の配列。各要素は `location`（親ページの URL と名前）、`store_ids`（型ごと。「一致」「近い」の DB だけ）、`match`（型ごとに `result`（`一致`／`近い`／`不一致`）、`missing_properties`（足りないプロパティ）、`differing_properties`（名前は同じで型が違うもの）、`renamed_properties`（名前は違うが対応づけられるもの: 既存名 → 正準項目）、`id_prefix`（下記 7 で読んだ接頭辞）、`basis`（判断の根拠を 1 文））。ルートの子の候補を先頭にし、「一致」の多い順に並べる。印のある共通 DB が見つかったときは空。
+4. 印の無い DB は、名前とプロパティを `schema-v1.md` と比べて `role` を推定し、`scope` を `unknown` として `databases` に載せる（取り込みの材料）。共通の型と推定した DB も載せる（`adoptable` の DB と同じ `id`）。
+5. `migration`: トップページの `ACT 設定` の `migrating`・`migrating_since`・`run_id`。共通 DB だけが移行中なら、説明文の 1 行目末尾の ` migrating <run_id> <日時>`（取り込み途中の印の無い DB では先頭の ` migrating` だけの行）から読む。
 6. `workspace`・`user`: `notion-get-self` から。
+7. `id_prefixes`: ワークスペースで使われている ID の接頭辞。Notion の ID（一意 ID）の接頭辞はワークスペース内で一意でなければならず、使用済みの接頭辞で DB を作ると Notion が拒否する（`apply` が途中で止まる）ので、`plan` で衝突を見つけるために集める。
+   - 対象の DB: この `inspect` で見つけた DB すべて（ルートの子、プロジェクトのトップページの子、`[ACT]` の検索結果、`adoptable` の材料）と、`notion-search` で `schema-v1.md` の DB 名（絵文字を除く）を検索して見つかった DB。
+   - 各 DB の ID のプロパティ（一意 ID）の接頭辞を次の順で読む。コネクタは DB のスキーマに接頭辞を出さないことがあるため、出ていなければ行の値から読む。
+     1. `notion-fetch` で取れる DB のスキーマに接頭辞が出ていれば、それを使う（`source: schema`）。
+     2. 出ていなければ、`notion-query-data-sources` で行を 3 件まで取り、ID の値（例 `CLI-12`）の末尾の `-<数字>` を除いた部分を接頭辞とする（`source: row`）。値が数字だけなら接頭辞なし（`prefix: null`）。3 件で接頭辞が食い違えば、多い方を使い `basis` に書く。
+     3. 行が無い DB は接頭辞を読めない（`prefix: null`、`source: unknown`）。
+   - 各要素は `prefix`、`database`（DB の識別子）、`name`、`url`、`marked`（`[ACT]` 印があるか）、`type`（印の型、または推定した型。分からなければ `null`）、`source`（`schema`／`row`／`unknown`）。
+   - 検索で見つからない DB（共有されていない、ゴミ箱にある、名前が違う）は照合できない。`id_prefix_check` に `{ "checked": <照合した DB の数>, "unknown": <接頭辞を読めなかった DB の数>, "complete": false }` を返す（Notion では常に `complete: false`）。
+
+#### 共通 DB の照合
+
+印の無い DB を、`schema-v1.md` の共通 DB の定義と比べて `result` を決める。
+
+- **一致**: DB 名（絵文字と空白を除く）が定義の DB 名と同じか、タイトルのプロパティ名が定義と同じで、定義のプロパティがすべて同じ名前・同じ型である（人が足したプロパティがあってもよい）。
+- **近い**: 名前かタイトルのプロパティ名が合い、定義のプロパティの半分以上が名前（または `renamed_properties` で対応づけられる名前）と型で合う。足りないプロパティは取り込みで足せる。
+- **不一致**: それ以外。`adoptable` には載せない。
+- 型が違うプロパティ（`differing_properties`）は、足しても直せない（同じ名前で作れない）ので、1 つでもあれば最大で「近い」にする。
+- ID のプロパティの接頭辞が定義（`CLI`／`TAG`／`KNW`）と違うか無いときは、照合の結果は変えず、`basis` にその旨を書く（接頭辞は変えない。取り込み後も既存の ID の値をそのまま使う）。
 
 ### `plan`
 
@@ -53,7 +73,23 @@ Notion の構成（DB・プロパティ・本文テンプレート・ACT の印�
 - **共通側**
   - `shared.store_ids` に揃っていれば作らない（つなぐだけ）。足りない共通 DB の作成と、版 1 の初期タグ（`種類:` 7 件と `汎用`）を `追加` にする。
   - `shared.candidates` があれば、`shared_choice` が渡されるまで共通側の変更を作らず、`changes` に `category: 手作業`・`description: 共通 DB の候補が複数ある。どれを使うか選んで再計画する` を 1 件だけ入れる。
-  - 共通側の版が `target_schema_version` より古ければ、共通 DB の移行を 1 版ずつ並べる。
+  - `shared.store_ids` が空で `shared.adoptable` があるときは、`shared_choice` で次のように決める。
+    - `shared_choice` が無い: 候補が 1 組なら、その組を取り込む計画を作る（下記）。2 組以上なら、共通側の変更を作らず、`changes` に `category: 手作業`・`description: 印の無い共通 DB の候補が複数ある。取り込む候補か新規作成を選んで再計画する` を 1 件だけ入れる。
+    - `shared_choice` が候補の `location`: その組を取り込む計画を作る。
+    - `shared_choice` が `new`: 取り込まずに新規作成する（上の 1 つ目の規則）。この場合も ID の接頭辞の衝突は下記で調べる。
+  - **取り込み（共通側）**: 候補の組の「一致」「近い」の DB を、型ごとに次の変更にする。どれも `adopt: { "type": <型>, "database": <既存の DB の識別子> }` を付ける（呼び出し元はこれで取り込みの変更と分かり、確認が要る項目にする）。
+    - 足りないプロパティ（`missing_properties`）の作成を `追加` にする。`renamed_properties` は名前を変えずに `mapping_proposal` に載せる（プロジェクト側の取り込みと同じ扱い。`type` に共通の型を書く）。
+    - 型が違うプロパティ（`differing_properties`）は変えず、`手作業` にして `description` に食い違いを書く（その DB を ACT で使うと、そのプロパティは読み書きできない）。
+    - 最後に、説明文の 1 行目に `[ACT] type=<型> schema=notion/1` を書く変更を `追加` にする。既存の説明文は 2 行目以降に残す。
+    - 候補の組に無い共通の型は新規作成にする（下記の接頭辞の照合を通す）。
+    - 版 1 の初期タグは、🏷 タグ を取り込むときは既存の行を名前と別名で探し、無いものだけを `追加` にする。
+- **ID の接頭辞の照合**: DB を作る変更（共通側・プロジェクト側とも）ごとに、作る ID のプロパティの接頭辞（`schema-v1.md` の型と DB の対応。プロジェクト側は `<KEY>` を `project_key` に置き換える）を `inspection.id_prefixes` と照らす。同じ `prefix` を持つ DB があれば、その DB の作成を `changes` に入れず、`prefix_conflicts` に `{ "prefix", "type", "used_by": { "database", "name", "url", "marked", "type" }, "resolution" }` を 1 件足す。`resolution` は次のどれか。
+  - `adopt`: 使っている DB が、同じ型の取り込みの候補（`adoptable`）にある。`shared_choice: new` をやめて取り込めば衝突しない。
+  - `change_key`: プロジェクト側の型（`<KEY>-*`）。プロジェクトキーを変えれば衝突しない。
+  - `manual`: それ以外。使っている DB の ID の接頭辞を Notion で変えるか、その DB を消す（ゴミ箱も空にする）まで作れない。
+  - 衝突した DB の作成だけを外し、ほかの変更は通常どおり返す。計画を止めるかどうかは呼び出し元が決める。
+  - `id_prefix_check.unknown` が 1 以上なら、`prefix_unchecked` に接頭辞を読めなかった DB（名前と URL）を並べる（行が無い DB と同じ接頭辞は、作るときに初めて衝突が分かる）。
+- 共通側の版が `target_schema_version` より古ければ、共通 DB の移行を 1 版ずつ並べる。
 - 変更 ID は `<分類の頭文字>-<連番>`（例: `A-1`、`C-2`）。`変換` には `samples`（実際のページ 3 件程度の変換前後）と `affected_pages` を付ける。
 - 削除は `changes` に入れない。不要なプロパティは `旧_` を付けて名前を変える `変換` にする。
 - `manual_steps` に `schema-v1.md` の「手作業が必要な設定」のうち、この計画で作る DB に関わるものを入れる。
@@ -62,9 +98,10 @@ Notion の構成（DB・プロパティ・本文テンプレート・ACT の印�
 
 渡された `changes` だけを、渡された順に適用する。
 
-1. 移行中の印を付ける。プロジェクトのトップページ（無ければ最初に作る）の `ACT 設定`（無ければ `schema` を空にして作る）に `migrating: true`、`migrating_since`、`run_id`、`project_key` を書く。共通 DB を変えるときは、その DB の説明文の 1 行目末尾に ` migrating <run_id> <日時>` を付ける。既に別の `run_id` の印があれば何もせず `conflict` を返す（同じ `run_id` なら続ける）。
+1. 移行中の印を付ける。プロジェクトのトップページ（無ければ最初に作る）の `ACT 設定`（無ければ `schema` を空にして作る）に `migrating: true`、`migrating_since`、`run_id`、`project_key` を書く。共通 DB を変えるときは、その DB の説明文の 1 行目末尾に ` migrating <run_id> <日時>` を付ける（取り込む DB でまだ `[ACT]` 印が無いものは、` migrating <run_id> <日時>` だけの行を説明文の先頭に足す）。既に別の `run_id` の印があれば何もせず `conflict` を返す（同じ `run_id` なら続ける）。
 2. 各変更を適用し、`results` に `success`／`failed`／`already_applied` を記録する。適用前に現状を読み、既に目的の状態なら書かずに `already_applied` とする（冪等）。
-   - DB の作成: `schema-v1.md` のプロパティで作り、説明文の 1 行目に `[ACT] type=<型> schema=notion/<版>` を書く。ID のプロパティは接頭辞を付ける。
+   - DB の作成: `schema-v1.md` のプロパティで作り、説明文の 1 行目に `[ACT] type=<型> schema=notion/<版>` を書く。ID のプロパティは接頭辞を付ける。作る直前に、その接頭辞を `inspect` の 7 と同じ方法で（このとき見つかる DB について）もう一度照らし、使用済みなら作らずに `failed` とし、`conflict` を返す（`message` は `ID の接頭辞 <接頭辞> は <DB 名>（<URL>）で使用済み`）。Notion が接頭辞の使用済みで作成を拒否したときも同じく `failed`・`conflict` とし、`message` に接頭辞と「使用元は検索で見つからなかった（共有されていない DB かゴミ箱の DB の可能性）」を書く。どちらも再実行では解消しない。
+   - 共通 DB の取り込み（`adopt` の付いた変更）: 既存の DB の識別子に対して適用する。印を書く変更は、説明文の 1 行目に `[ACT] type=<型> schema=notion/<版>` を入れ、既存の説明文は 2 行目以降に残す（取り込みの途中で足した ` migrating` の行はこのとき外す）。既にその印があれば `already_applied`。
    - プロパティ名の変更と、同じ名前のプロパティの追加は、1 回の更新に混ぜない（元の値が失われるため）。変換は、旧名に `旧_` を付けて残す → 新しいプロパティを作る → 値を写す → 写した値を照合する、の順に別々の更新で行う。
    - タグの作成は 🏷 タグ に行を足す。既に同じ名前があれば `already_applied`。
 3. 1 つでも `failed` があれば、そこで止める（後の変更は適用しない）。
@@ -73,7 +110,7 @@ Notion の構成（DB・プロパティ・本文テンプレート・ACT の印�
 
 ### `clear_migration`
 
-`run_id` の印が残っている `ACT 設定` と共通 DB の説明文から印を外し、`ACT 移行ログ` に「印を外した（実行 `run_id` が途中で止まっていた）」を追記する。印の `run_id` が違えば何もせず `conflict` を返す。保存先のほかの内容は変えない。
+`run_id` の印が残っている `ACT 設定` と共通 DB の説明文から印を外し（先頭の ` migrating` だけの行は行ごと消す）、`ACT 移行ログ` に「印を外した（実行 `run_id` が途中で止まっていた）」を追記する。印の `run_id` が違えば何もせず `conflict` を返す。保存先のほかの内容は変えない。
 
 ### 対応づけ（`mapping`）
 
@@ -114,6 +151,7 @@ Notion の権限は API で読めない。読み取りは対象を `notion-fetch
 | 権限が無い・共有されていない（403、restricted） | `permission_denied` |
 | ページ・DB が見つからない（404） | `not_found` |
 | 移行中の印が別の `run_id` で付いている | `conflict` |
+| ID の接頭辞が使用済みで DB を作れない | `conflict`（`message` に接頭辞と使用元。時間をおいても解消しないことを書く） |
 | 同時更新・レート制限で失敗（409・429） | `conflict` |
 | `put_file`・`get_file`、未対応の型 | `unsupported` |
 | 入力の形が合わない | `invalid_request` |

@@ -43,7 +43,9 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
 }
 ```
 
-型は `decision`、`task`、`knowledge`、`artifact_meta`、`request`、`adoption`、`project_registry`、`client`、`tag`、`membership`、`workflow_config`。
+型は `decision`、`task`、`knowledge`、`artifact_meta`、`run_log`、`daily_summary`、`project_registry`、`client`、`tag`、`membership`、`workflow_config`。
+
+判断依頼は `task` の `kind: request`（`kind` は `defined`／`auxiliary`／`request`）で表し、属性 `to_role`（宛先の役割: `manager`／`business_owner`）・`request_result`（判断の結果: 承認／却下）・`affected_tasks`（影響するタスクの ID）を持つ。
 
 ## 操作一覧
 
@@ -51,9 +53,9 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
 | --- | --- | --- |
 | `describe` | なし | `adapter`、`schema_version`（このアダプタが目標とする版）、`types`（対応する型）、`ops`（対応する操作）、`permission_check`（権限の確認方法） |
 | `inspect` | `location`、`project_key`、`project_name`（下記） | 下記 |
-| `plan` | `inspection`（`inspect` の結果）、`target_schema_version`、`mode`（`新規作成`／`取り込み`／`更新`）、`mapping`（任意）、`shared_choice`（共通 DB の候補が複数あったとき、または印の無い共通 DB の取り込みの候補があったときに選んだもの。候補の場所か、取り込まずに新しく作る `new`） | `changes`、`mapping_proposal`、`manual_steps`、`prefix_conflicts`、`prefix_unchecked`（下記） |
-| `apply` | `changes`（承認された変更だけ）、`mapping`（確定した対応づけ。取り込み・更新のとき）、`run_id`（実行の識別子。呼び出し元の作業フォルダ名など）、`project_key` | `results`（変更 ID ごとに `success`／`failed`／`already_applied`）、`schema_version`（適用後の版）、`store_ids`（型ごとの DB 識別子） |
-| `clear_migration` | `run_id`（止まった実行の識別子） | なし。止まった移行の印を外す（下記「移行中の印」） |
+| `plan` | `inspection`（`inspect` の結果）、`target_schema_version`、`mode`（`新規作成`／`取り込み`／`更新`）、`mapping`（任意）、`shared_choice`（共通 DB の候補が複数あったとき、または印の無い共通 DB の取り込みの候補があったときに選んだもの。候補の場所か、取り込まずに新しく作る `new`）、`project_profile`（任意。`name`・`client`。プロジェクトの保存先を新しく作るとき、トップページなどの記録の雛形に使う） | `changes`、`mapping_proposal`、`manual_steps`、`prefix_conflicts`、`prefix_unchecked`（下記） |
+| `apply` | `changes`（承認された変更だけ）、`mapping`（確定した対応づけ。取り込み・更新のとき）、`run_id`（実行の識別子。呼び出し元の作業フォルダ名など）、`project_key` | `results`（変更 ID ごとに `success`／`failed`／`already_applied`）、`schema_version_before`（適用前の版）、`schema_version`（適用後の版）、`store_ids`（型ごとの DB 識別子） |
+| `clear_migration` | `run_id`（止まった実行の識別子） | `{ "cleared": true, "run_id" }`。止まった移行の印を外す（下記「移行中の印」） |
 | `query` | `type`、`filter`（属性の条件: 状態・担当・期間・キーワード・関連 ID・名前・別名） | エンティティの配列（`attributes` だけ。`narrative` は含めない） |
 | `get` | `type`、`id` | エンティティ（`narrative` を含む） |
 | `create` | `type`、`entity` | `id`、`url` |
@@ -112,7 +114,7 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
 - 冪等: 同じ `changes` を 2 回渡しても結果は変わらない。適用済みの変更は `already_applied` で返す。
 - 途中で失敗したら、そこまでの結果を `results` に返す。続きは同じ `changes` で再び呼べば進む。
 - 適用を始めるときに、まずプロジェクトの記録の置き場所（版は空のまま）を作る。版は全部の変更が終わってから書く。これで、途中で止まった保存先は `inspect` で `partial: true` になり、どこからやり直しても不足分（`missing_types`）を作り直せる。
-- 適用中であることの表示（移行中の印）、保存先への版の記録、移行ログはアダプタが行う。
+- 移行中の印と版の記録はアダプタが行う。実行の記録（移行を含む）は呼び出し元が実行ログに残す（下記「実行ログ」）。
 
 ### 移行中の印
 
@@ -121,6 +123,28 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
   - 同じ `run_id` の `apply` は、印があっても続きから進めてよい。
   - 別の `run_id` の書き込みは `conflict` を返す。
   - 処理が切れて印が残ったときは、呼び出し元が人に確認したうえで `clear_migration`（止まった実行の `run_id` を渡す）を呼んで外す。外した後は、`inspect` → `plan` → `apply` で続きから適用できる。
+
+## 実行ログ
+
+保存先に書いたワークフローの実行を、型 `run_log` で 1 実行 1 件残す。`run_id` は `apply` に渡した実行の識別子（呼び出し元の作業フォルダ名など）。
+
+- いつ書くか: 実行が終わったとき（途中で止まったときも）に 1 件 `create` する。保存先に何も書かずに終えた実行（中止、採用 0 件）は書かない。同じ `run_id` の続き（続きからの適用）は、その件を `update` で置き換える。ほかの件は変えない。
+- 形:
+  - 属性: `id`（`run_id`）、`workflow`（ワークフロー ID: C0〜C6／E1〜E5／M1〜M7）、`run_by`（メンバー）、`started_at`・`finished_at`、`result`（成功／一部失敗／失敗）、`scheduled`（定期実行か）、`applied_count`・`held_count`・`failed_count`、`schema_change`（移行したときだけ。例 `notion/1→notion/2`、`共通: notion/1→notion/2`）
+  - 件数の数え方: `applied_count` は `apply` の `results` の `success` と `already_applied` の数、`failed_count` は `failed` の数（権限エラーで適用できなかった項目を含む）、`held_count` は承認されず保留と確定した項目の数。
+  - `result` の決め方: `applied_count` が 0 なら失敗、1 以上で `failed_count` が 0 なら成功、どちらも 1 以上なら一部失敗。
+  - 記述: `summary`（概要）、`applied`（適用した変更）、`held`（保留した項目）、`issues`（失敗・警告）
+- 書く役: 呼び出し元のワークフロー。アダプタは実行の記録を書かず、記録に要る値（`apply` の `results`、`schema_version_before`・`schema_version`）を返すだけにする。共通の保存先だけの移行も、その実行をしたプロジェクトの実行ログに残す。
+- 書かないもの: 秘密情報、実行者の PC のパス。
+- 書けないとき: 実行ログの置き場所が無い（DB が未作成、アダプタが `run_log` に未対応）ときは、作業フォルダだけに残して警告する。
+
+作業フォルダとの分担:
+
+| | 作業フォルダ | 実行ログ |
+| --- | --- | --- |
+| 置き場所 | 実行者の PC | 保存先（チームで共有） |
+| 中身 | 中間生成物、項目ごとの適用記録 | 1 実行 1 件の要約 |
+| 使い道 | 本人の詳細確認、続きからの適用の起点 | 誰がいつ何をしたかをチームで見る。保留した項目を次回に示す |
 
 ## 本文の更新ルール
 
@@ -131,6 +155,7 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
 | 状況サマリ | `replace`（同時に `status_updated_at` を更新） |
 | 進捗ログ、経緯 | `append`（日付付き）。過去の行は変えない |
 | 完了条件 | チェック状態の変更だけ。条件の追加・変更はマネージャーの操作 |
+| 実行ログ | 作成時に書く。同じ `run_id` の続きだけが置き換える |
 | その他のセクション | 作成時に書く。以降の変更は書き込み計画で差分を示して確認を取る |
 | テンプレートに無い見出し・段落 | 人が足したものとして残す。消さない |
 

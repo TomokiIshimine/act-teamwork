@@ -1,5 +1,5 @@
 {
   "name": "act-store-localfs",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "ACT の保存先アダプタ（ローカルファイル）。アーティファクト本体を、プロジェクトの共有フォルダ（Google ドライブ等の同期先）に版とハッシュ付きで置く。act-core と一緒に使う。"
 }

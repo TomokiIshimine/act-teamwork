@@ -82,7 +82,7 @@ color: cyan
 - 保存先の場所（新規プロジェクト作成）: 引数に URL があれば高。無ければ空・低。
 - 保存先の種類（新規プロジェクト作成）: URL が Notion のもの（`notion.so`／`notion.site`）なら `notion`・高。URL が無ければ、個人設定の他プロジェクトの `accounts` に `notion` があるとき `notion`・中、それも無ければ `notion`・低（メタ情報の初期の保存先が Notion のため）。
 - 保存先の場所・種類（参加・保存先更新）: `project.yaml` の `stores` から次の順で 1 つの保存先を選び、その値を使う。引数の URL は使わない（共有設定が正のため。引数に URL があったときは、使わなかったことを `## 警告` に書く）。
-  1. `stores` のうち `adapter` が `localfs` でなく、`shared: true` でない最初の項目を、`artifact_meta`→`decision`→`task`→`request`→`adoption`→`workflow_config` の順で探す。見つかれば、保存先の種類はその `adapter`、保存先の場所はその `database` の値（Notion では既存 DB の識別子。`inspect` は既存ページとして受け取り、そこからプロジェクトの保存先をたどる）。
+  1. `stores` のうち `adapter` が `localfs` でなく、`shared: true` でない最初の項目を、`artifact_meta`→`decision`→`task`→`workflow_config`→`run_log` の順で探す。見つかれば、保存先の種類はその `adapter`、保存先の場所はその `database` の値（Notion では既存 DB の識別子。`inspect` は既存ページとして受け取り、そこからプロジェクトの保存先をたどる）。
   2. 1. で見つからず、すべての項目の `adapter` が `localfs` なら、保存先の種類は `localfs`、保存先の場所は `<root>`。
   3. どちらでもなければ（`stores` が無い、`database` が空など）、決められないとして中止にする（経路の判定の中止条件）。
 

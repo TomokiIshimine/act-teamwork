@@ -29,6 +29,7 @@ argument-hint: "[プロジェクト名] [共有フォルダのパス] [保存先
 - 戻り値が `ERROR:` で始まったときの扱いは「失敗時の対応」に従う。
 - 戻せない操作（保存先への登録・作成・変更、設定ファイルの作成・追記）の前に、内容を示してユーザーの承認を取る。本ワークフローでは Step 5 の変更計画フォームがその承認にあたり、Step 6 は承認された項目だけを適用する。
 - 作業開始前に 1 回だけ `ToolSearch` を `query: "select:AskUserQuestion"`、`max_results: 1` で呼び、`AskUserQuestion` を使えるようにする。読み込めないときの尋ね方は `act-core:write-plan` の「部品の選び方」の段の下げ方に従う（Step 1 の質問も同じ）。
+- 作業開始前に `Skill` ツールで `act-core:local-files` を読む。メインが読み書きする設定ファイルと作業フォルダ（Step 1 の前回の実行の確認、`02_inputs.yaml`・`04_approved-plan.json` の書き込みなど）は、これに従う。
 - Step 3・5 の確認フォームの組み立て（部品の選び方と、使えない環境での段の下げ方）と確信度の示し方は `act-core:write-plan` に従う。Step 3 の前に `Skill` ツールで `act-core:write-plan` を読み込む。メインとサブエージェントの間で受け渡すファイル（`02_inputs.yaml`、`04_approved-plan.json`）のキーは、本スキルの定めを正とする。
 - 時間のかかるステップ（Step 4・6）の前に、何をしているかを 1 行でユーザーに伝える。
 
@@ -55,7 +56,7 @@ argument-hint: "[プロジェクト名] [共有フォルダのパス] [保存先
 
 - 個人設定の実体パスを `<config-path>`（絶対パス）とし、Step 2・6 に渡す。
 - Claude Code では `~/.act/` と共有フォルダ `<root>` をそのまま読み書きする。`<config-path>` は `~/.act/config.yaml` を絶対パスに展開したもの。
-- Cowork では `~/.act/` と `<root>` はメンバーの PC 上にあり、Step 1 で接続フォルダにする。メインとサブエージェントに渡すパスは PC 上の絶対パス（`/Users/...` など）とし、個人設定に書く `root` もこの形にする。`mcp__remote-devices__device_bash` では接続フォルダが `$HOME/mnt/<フォルダ名>` に見えるので読み替える（`device_bash` の `~` は PC のホームではない）。
+- Cowork では `~/.act/` と `<root>` はメンバーの PC 上にあり、Step 1 で接続フォルダにする。メインとサブエージェントに渡すパスは PC 上の絶対パス（`/Users/...` など）とし、個人設定に書く `root` もこの形にする。読み書きの手段（接続フォルダの読み替えを含む）は、メインもサブエージェントも `act-core:local-files` に従う。
 
 ### 03_setup-plan.json の形
 

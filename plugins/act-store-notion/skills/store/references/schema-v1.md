@@ -23,6 +23,7 @@
 ```
 
 - 共通 DB は、同じワークスペースに既にあれば作らずにつなぐ（`inspect` の `shared` で見つけたもの）。共通 DB を置く場所は、最初に作ったときの親ページ。
+- `[ACT]` 印の無い既存の共通 DB（手で作った保存例など）は、この定義と照合して取り込める（`inspect` の `shared.adoptable`）。取り込むと説明文の 1 行目に印を書き、足りないプロパティを足す。既存のプロパティ名・ID の接頭辞は変えない。
 - プロジェクトの DB 一式は、プロジェクトのトップページの下に作る。トップページが無ければ親ページの下に `ACT: <プロジェクト名>` を作る。
 
 ## ACT の印（マーカー）
@@ -57,7 +58,7 @@ ACT が管理する DB とページは、次の印で見分ける。
 | `workflow_config` | ⚙️ ワークフロー設定 | プロジェクト | `<KEY>-CFG` |
 | `daily_summary` | 📰 デイリーサマリー | プロジェクト | `<KEY>-SUM` |
 
-`<KEY>` はプロジェクトキー。ID の接頭辞はこの表を正とする（要件定義書 §6.2 の `id_prefix` の既定もこの表に合わせてある）。`project.yaml` の `stores.project_registry` は `{ "projects": 📁, "clients": 🏢, "tags": 🏷 }` の 3 つの識別子を持つので、`store_ids` でも `project_registry` は `{ "projects": ..., "clients": ..., "tags": ... }` の形で返す。
+`<KEY>` はプロジェクトキー。Notion の ID の接頭辞はワークスペース内で一意でなければならない（同じ接頭辞の DB は作れない。ゴミ箱の DB も使用済みに数えられることがある）。そのため同じワークスペースに共通 DB は 1 組だけ置き、プロジェクトキーはワークスペース内で重ならないものにする。ID の接頭辞はこの表を正とする（要件定義書 §6.2 の `id_prefix` の既定もこの表に合わせてある）。`project.yaml` の `stores.project_registry` は `{ "projects": 📁, "clients": 🏢, "tags": 🏷 }` の 3 つの識別子を持つので、`store_ids` でも `project_registry` は `{ "projects": ..., "clients": ..., "tags": ... }` の形で返す。
 
 ## プロパティ
 

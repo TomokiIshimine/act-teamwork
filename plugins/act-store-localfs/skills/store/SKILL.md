@@ -48,7 +48,7 @@ description: ACT の保存先アダプタ（ローカルファイル）。プロ
   - `partial`: ファイルはあるが `schema` が空なら `true`
   - `store_ids`: `{ "artifact_body": "<root>" }`（管理下のときだけ）
   - `missing_types`: 版 1 の構成のフォルダのうち無いものがあれば `["artifact_body"]`、無ければ空
-- `shared`: `{ "store_ids": {}, "recorded_schema_version": null, "candidates": [] }`（共通の保存先は持たない）
+- `shared`: `{ "store_ids": {}, "recorded_schema_version": null, "candidates": [], "adoptable": [] }`（共通の保存先は持たない）
 - `databases`: 版 1 の構成のフォルダごとに `{ "role": "artifact_body", "name": <フォルダ名>, "id": <root からの相対パス>, "properties": [], "template_headings": [], "scope": "project" }`（あるものだけ）。版 1 の構成に無い直下のフォルダは `scope: unknown` で載せる（取り込みの材料）
 - `migration`: `store-localfs.json` の `migrating`・`migrating_since`・`run_id`
 - `workspace`: `root`（照合用。共有フォルダのパス）
@@ -61,7 +61,7 @@ description: ACT の保存先アダプタ（ローカルファイル）。プロ
 - **新規作成・適用途中**: 版 1 の構成の無いフォルダと `.act/store-localfs.json` の作成を `追加` として並べる。既にあるフォルダは載せない。
 - **取り込み**: 既存のフォルダを `layout` の各分類に対応づける案を `mapping_proposal` にする（例: 既存の `議事録/` を `minutes` に使う）。対応づけたフォルダは作らず、`layout` をその名前で書く変更にする。既存のファイルは移動しない。
 - **更新**: 1 版ずつ移行手順を並べる（版 1 は最初の版なので、版 1 への更新は無い）。
-- 削除・移動は載せない。`manual_steps` は空。
+- 削除・移動は載せない。`manual_steps`・`prefix_conflicts`・`prefix_unchecked` は空（ID の接頭辞を持たない）。
 
 ### `apply`
 

@@ -50,9 +50,10 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
 | 操作 | 入力（`args`） | 出力（`result`） |
 | --- | --- | --- |
 | `describe` | なし | `adapter`、`schema_version`（このアダプタが目標とする版）、`types`（対応する型）、`ops`（対応する操作）、`permission_check`（権限の確認方法） |
-| `inspect` | `location`（下記） | 下記 |
-| `plan` | `inspection`（`inspect` の結果）、`target_schema_version`、`mode`（`新規作成`／`取り込み`／`更新`）、`mapping`（任意） | `changes`、`mapping_proposal`、`manual_steps`（下記） |
-| `apply` | `changes`（承認された変更だけ）、`mapping`（確定した対応づけ。取り込み・更新のとき） | `results`（変更 ID ごとに `success`／`failed`／`already_applied`）、`schema_version`（適用後の版）、`store_ids`（型ごとの DB 識別子） |
+| `inspect` | `location`、`project_key`、`project_name`（下記） | 下記 |
+| `plan` | `inspection`（`inspect` の結果）、`target_schema_version`、`mode`（`新規作成`／`取り込み`／`更新`）、`mapping`（任意）、`shared_choice`（共通 DB の候補が複数あったときに選んだもの） | `changes`、`mapping_proposal`、`manual_steps`（下記） |
+| `apply` | `changes`（承認された変更だけ）、`mapping`（確定した対応づけ。取り込み・更新のとき）、`run_id`（実行の識別子。呼び出し元の作業フォルダ名など）、`project_key` | `results`（変更 ID ごとに `success`／`failed`／`already_applied`）、`schema_version`（適用後の版）、`store_ids`（型ごとの DB 識別子） |
+| `clear_migration` | `run_id`（止まった実行の識別子） | なし。止まった移行の印を外す（下記「移行中の印」） |
 | `query` | `type`、`filter`（属性の条件: 状態・担当・期間・キーワード・関連 ID・名前・別名） | エンティティの配列（`attributes` だけ。`narrative` は含めない） |
 | `get` | `type`、`id` | エンティティ（`narrative` を含む） |
 | `create` | `type`、`entity` | `id`、`url` |
@@ -64,19 +65,36 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
 
 `query` は属性だけで絞り込み、属性だけを返す。記述が要るときだけ `get` で取る。
 
+### 対応づけ（`mapping`）は読み替えに使う
+
+取り込みで既存の DB を ACT の管理下に置いたとき、既存のプロパティ名は変えない。`mapping`（型ごとに、正準項目 → 既存プロパティ名）で読み替える。
+
+- 呼び出し元は、`query`・`get`・`create`・`update`・`link` を含むすべての操作の `args` に、その型の `mapping` を渡す（`project.yaml` の `stores.<型>.mapping`。空なら省略してよい）。
+- アダプタは、`mapping` にある正準項目はその既存プロパティ名で読み書きし、無い項目は自分のスキーマの名前を使う。
+- 取り込みの `plan` では、「名前を変えて使う」項目はプロパティ名を変えずに `mapping` に載せるだけにする（`変換` にしない）。
+
 ### `inspect`
 
-- 入力 `location` は次のどれでもよい。アダプタは受け取った値の形から判別する。
-  - Notion: 親ページまたは既存ページの URL、または DB／データソースの識別子（`project.yaml` の `stores.<型>.database`）。
-  - localfs: 共有フォルダのパス（`root`）。
+- 入力:
+  - `location`: 次のどれでもよい。アダプタは値の形から判別する。
+    - Notion: ACT のルートページ（共通 DB とプロジェクトのトップページを置く親ページ）か、プロジェクトのトップページの URL、または DB／データソースの識別子（`project.yaml` の `stores.<型>.database`）。
+    - localfs: 共有フォルダのパス（`root`）。
+  - `project_key`、`project_name`: 対象のプロジェクト。アダプタはこのキーのプロジェクトの保存先だけをプロジェクト側として扱い、同じ場所にある別のプロジェクトの保存先を取り違えない。
 - 出力:
-  - `managed`: ACT の管理下か（保存先にスキーマ版の記録があるか）
-  - `recorded_schema_version`: 保存先に記録された版。無ければ `null`
-  - `databases`: 見つかった DB の配列。各要素は `role`（推定した型。分からなければ `null`）、`name`、`id`（DB／データソースの識別子）、`properties`（名前と型）、`template_headings`（本文テンプレートの見出し）
-  - `store_ids`: ACT の型に対応づいた DB の識別子（型 → 識別子）。ACT の管理下にある DB だけを載せる。`project.yaml` の `stores` を埋めるのに使える
-  - `shared`: 同じ接続先にある共通 DB（`projects`、`clients`、`tags`、`knowledge`）の識別子。無ければ `null`
-  - `migration_in_progress`: 移行中か
-  - `workspace`: 接続先の識別子（Notion ならワークスペース ID）
+  - `project`: 対象プロジェクトの保存先。
+    - `managed`: このプロジェクトの ACT の記録（スキーマ版などの記録の置き場所）があるか
+    - `recorded_schema_version`: 記録された版。記録はあるが版が無い（前回の適用が途中で止まった）、または記録が無いときは `null`
+    - `partial`: 記録はあるが版が無いとき `true`（適用途中）
+    - `store_ids`: このプロジェクトの型ごとの DB 識別子（ACT の管理下にあるものだけ）
+    - `missing_types`: 現在の版の構成にあってまだ無い型
+  - `shared`: 全プロジェクト共通の保存先（Notion ならクライアント・プロジェクト一覧・タグ・ナレッジ）。
+    - `store_ids`: 型ごとの識別子。見つからなければ空
+    - `recorded_schema_version`: 共通の保存先に記録された版。無ければ `null`
+    - `candidates`: 起点の近くで見つからず、離れた場所で 2 つ以上見つかったときの候補（それぞれの場所と `store_ids`）。1 つに決まったときは空
+  - `databases`: 見つかった DB の配列。各要素は `role`（推定した型。分からなければ `null`）、`name`、`id`、`properties`（名前と型）、`template_headings`、`scope`（`project`／`shared`／`unknown`）
+  - `migration`: `{ "in_progress": 真偽, "since": 日時, "run_id": 識別子 }`（下記「移行中の印」）
+  - `workspace`: 接続先の識別子（Notion ならワークスペース ID、localfs なら `root`）
+  - `user`: 接続しているアカウントの `name`・`email`・`id`（分かる範囲で）
 
 ### `plan` の出力
 
@@ -89,7 +107,16 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
 
 - 冪等: 同じ `changes` を 2 回渡しても結果は変わらない。適用済みの変更は `already_applied` で返す。
 - 途中で失敗したら、そこまでの結果を `results` に返す。続きは同じ `changes` で再び呼べば進む。
-- 適用中であることの表示、保存先への版の記録、移行ログはアダプタが行う。
+- 適用を始めるときに、まずプロジェクトの記録の置き場所（版は空のまま）を作る。版は全部の変更が終わってから書く。これで、途中で止まった保存先は `inspect` で `partial: true` になり、どこからやり直しても不足分（`missing_types`）を作り直せる。
+- 適用中であることの表示（移行中の印）、保存先への版の記録、移行ログはアダプタが行う。
+
+### 移行中の印
+
+- `apply` は始めに、変更する保存先（プロジェクト側、共通側の両方）に `{ in_progress: true, since: <日時>, run_id: <args.run_id> }` を記録し、終わったら（失敗で止まったときも）外す。
+- 印が残っているときの扱い:
+  - 同じ `run_id` の `apply` は、印があっても続きから進めてよい。
+  - 別の `run_id` の書き込みは `conflict` を返す。
+  - 処理が切れて印が残ったときは、呼び出し元が人に確認したうえで `clear_migration`（止まった実行の `run_id` を渡す）を呼んで外す。外した後は、`inspect` → `plan` → `apply` で続きから適用できる。
 
 ## 本文の更新ルール
 
@@ -117,7 +144,11 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
 
 ## 書き込み前の接続先の照合
 
-保存先の接続（Notion コネクタなど）は 1 つのワークスペースにしかつながらないことがある。書き込み（`apply`・`create`・`update`・`link`・`comment`・`put_file`）の前に、`inspect` の `workspace` と、個人設定 `~/.act/config.yaml` の `projects.<キー>.accounts.<adapter>.workspace` を照合する。違えば書かずに止め、接続先を切り替えるよう案内する。照合する値が無ければ、照合できない旨を警告して止める。
+保存先の接続（Notion コネクタなど）は 1 つのワークスペースにしかつながらないことがある。書き込み（`apply`・`create`・`update`・`link`・`comment`・`put_file`）の前に、`inspect` の `workspace` を、照合する値と比べる。違えば書かずに止め、接続先を切り替えるよう案内する。
+
+- 照合する値は、ふだんは個人設定 `~/.act/config.yaml` の `projects.<キー>.accounts.<adapter>.workspace`。
+- 初期設定のように個人設定にまだその値が無いときは、呼び出し元が持つ値（初期設定なら変更計画の `accounts.<adapter>.workspace`）を使う。この場合の照合は「計画を作った後に接続先が変わっていないか」の確認になる。
+- どちらの値も無ければ、照合できない旨を警告して止める。
 
 ## してはいけないこと
 

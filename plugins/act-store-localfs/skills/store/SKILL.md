@@ -28,7 +28,7 @@ description: ACT の保存先アダプタ（ローカルファイル）。プロ
 └── deliverables/             成果物（版付き）
 ```
 
-`store-localfs.json`: `{ "schema": "localfs/1", "migrating": false, "layout": { "minutes": "minutes/{date}_{title}.md", "input": "inputs/{kind}/{title}{ext}", "working": "work/{title}{ext}", "deliverable": "deliverables/{title}_{version}{ext}" } }`
+`store-localfs.json`: `{ "schema": "localfs/1", "project_key": "FAQ", "migrating": false, "migrating_since": null, "run_id": null, "layout": { "minutes": "minutes/{date}_{title}.md", "input": "inputs/{kind}/{title}{ext}", "working": "work/{title}{ext}", "deliverable": "deliverables/{title}_{version}{ext}" } }`
 
 配置規則（`layout`）は `project.yaml` の `stores.artifact_body.layout` が正。呼び出し元が `args.layout` で渡せばそれを使い、無ければ上の既定を使う。
 
@@ -36,36 +36,44 @@ description: ACT の保存先アダプタ（ローカルファイル）。プロ
 
 ### `describe`
 
-`{ "adapter": "localfs", "schema_version": 1, "types": ["artifact_body"], "ops": ["describe","inspect","plan","apply","put_file","get_file","check_permission"], "permission_check": "共有フォルダへの書き込みを一時ファイルで試す" }` を返す。
+`{ "adapter": "localfs", "schema_version": 1, "types": ["artifact_body"], "ops": ["describe","inspect","plan","apply","clear_migration","put_file","get_file","check_permission"], "permission_check": "共有フォルダへの書き込みを、このアダプタ専用の固定ファイルで試す" }` を返す。
 
 ### `inspect`
 
-`location`（`root`）を読み、次を返す。何も書かない。
+`location`（`root`）を読み、次を返す。何も書かない。共有フォルダはプロジェクトごとに別なので、`project_key` は照合だけに使う（`<root>/.act/store-localfs.json` の `project_key` が違えば、`project` に `mismatch: true` を付ける。呼び出し元はこれを警告にする）。
 
-- `managed`: `<root>/.act/store-localfs.json` があれば `true`
-- `recorded_schema_version`: その `schema` の版。無ければ `null`
-- `databases`: 版 1 の構成のフォルダごとに `{ "role": "artifact_body", "name": <フォルダ名>, "id": <root からの相対パス>, "properties": [], "template_headings": [] }`（あるものだけ）
-- `store_ids`: `{ "artifact_body": "<root>" }`（管理下のときだけ）
-- `shared`: `null`
-- `migration_in_progress`: `store-localfs.json` の `migrating`
+- `project`:
+  - `managed`: `<root>/.act/store-localfs.json` があれば `true`
+  - `recorded_schema_version`: その `schema` の版。ファイルはあるが `schema` が空なら `null`
+  - `partial`: ファイルはあるが `schema` が空なら `true`
+  - `store_ids`: `{ "artifact_body": "<root>" }`（管理下のときだけ）
+  - `missing_types`: 版 1 の構成のフォルダのうち無いものがあれば `["artifact_body"]`、無ければ空
+- `shared`: `{ "store_ids": {}, "recorded_schema_version": null, "candidates": [] }`（共通の保存先は持たない）
+- `databases`: 版 1 の構成のフォルダごとに `{ "role": "artifact_body", "name": <フォルダ名>, "id": <root からの相対パス>, "properties": [], "template_headings": [], "scope": "project" }`（あるものだけ）。版 1 の構成に無い直下のフォルダは `scope: unknown` で載せる（取り込みの材料）
+- `migration`: `store-localfs.json` の `migrating`・`migrating_since`・`run_id`
 - `workspace`: `root`（照合用。共有フォルダのパス）
+- `user`: `null`
 
 `root` が無ければ `not_found`。
 
 ### `plan`
 
-- **新規作成**: 版 1 の構成のフォルダと `.act/store-localfs.json` の作成を `追加` として並べる。既にあるフォルダは載せない。
+- **新規作成・適用途中**: 版 1 の構成の無いフォルダと `.act/store-localfs.json` の作成を `追加` として並べる。既にあるフォルダは載せない。
 - **取り込み**: 既存のフォルダを `layout` の各分類に対応づける案を `mapping_proposal` にする（例: 既存の `議事録/` を `minutes` に使う）。対応づけたフォルダは作らず、`layout` をその名前で書く変更にする。既存のファイルは移動しない。
 - **更新**: 1 版ずつ移行手順を並べる（版 1 は最初の版なので、版 1 への更新は無い）。
 - 削除・移動は載せない。`manual_steps` は空。
 
 ### `apply`
 
-1. `store-localfs.json` があれば `migrating` を `true` にする。
-2. 各変更を順に適用する。フォルダは既にあれば `already_applied`。`store-localfs.json` は最後に書く（`schema`、確定した `layout`、`migrating: false`）。
-3. `store-localfs.log` に 1 行追記する（日時、前後の版、適用した変更 ID、失敗）。
-4. 失敗した変更があれば、そこで止めて `migrating` を戻し、結果を返す。
+1. `.act/store-localfs.json` を（無ければ `schema` を空にして）用意し、`migrating: true`、`migrating_since`、`run_id`、`project_key` を書く。既に別の `run_id` で `migrating: true` なら何もせず `conflict` を返す（同じ `run_id` なら続ける）。
+2. 各変更を順に適用する。フォルダは既にあれば `already_applied`。
+3. 失敗した変更があれば、そこで止める。
+4. 終わったら（止まったときも）`migrating` を `false` に戻す。全部成功したときだけ `schema` に `localfs/1` と確定した `layout` を書く。`store-localfs.log` に 1 行追記する（日時、`run_id`、前後の版、適用した変更 ID、失敗）。
 5. `{ "results", "schema_version", "store_ids": { "artifact_body": "<root>" } }` を返す。
+
+### `clear_migration`
+
+`store-localfs.json` の `run_id` が渡された `run_id` と同じなら `migrating` を `false` にし、ログに「印を外した」を追記する。違えば何もせず `conflict` を返す。
 
 ### `put_file`
 
@@ -92,6 +100,6 @@ description: ACT の保存先アダプタ（ローカルファイル）。プロ
 | --- | --- |
 | 書き込みが拒否された（読み取り専用、権限なし、接続フォルダの外） | `permission_denied` |
 | `root` やファイルが無い | `not_found` |
-| `migrating` が `true`、同名の成果物が別の内容で既にある | `conflict` |
+| 移行中の印が別の `run_id` で付いている、同名の成果物が別の内容で既にある | `conflict` |
 | 扱わない操作・型 | `unsupported` |
 | 入力の形が合わない | `invalid_request` |

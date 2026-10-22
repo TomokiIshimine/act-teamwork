@@ -20,45 +20,64 @@ Notion の構成（DB・プロパティ・本文テンプレート・ACT の印�
 
 ### `describe`
 
-`{ "adapter": "notion", "schema_version": 1, "types": [<schema-v1.md の型と DB の対応の型すべて>], "ops": ["describe","inspect","plan","apply","query","get","create","update","link","comment","check_permission"], "permission_check": "Notion のページ権限は API で読めないため、check_permission は試験的な読み取りと、メンバー DB の役割から推定する" }` を返す。`put_file`・`get_file` は扱わない（`unsupported`）。
+`{ "adapter": "notion", "schema_version": 1, "types": [<schema-v1.md の型と DB の対応の型すべて>], "ops": ["describe","inspect","plan","apply","clear_migration","query","get","create","update","link","comment","check_permission"], "permission_check": "Notion のページ権限は API で読めないため、check_permission は試験的な読み取りで判定し、書き込みは unknown を返す" }` を返す。`put_file`・`get_file` は扱わない（`unsupported`）。
 
 ### `inspect`
 
-1. `location` を判別する。`https://` で始まればページの URL、それ以外は DB／データソースの識別子として `notion-fetch` で取得する。取得できなければ `not_found`。
-   - DB の識別子を受け取ったときは、その DB の親（プロジェクトのトップページ）を起点にする。
-2. 起点のページの子にある DB と、子ページ `ACT: <名前>`（プロジェクトのトップページ）の DB を集める。起点がプロジェクトのトップページなら、その親の子にある共通 DB も集める。
-3. 各 DB について、名前、識別子、プロパティ（名前と型）、本文テンプレートの見出し（テンプレートか既存ページ 1 件から）を読み、説明文の 1 行目の `[ACT]` 印から `role` を決める。印が無い DB は、名前とプロパティを `schema-v1.md` と比べて `role` を推定する（決められなければ `null`）。
-4. 次を返す。
-   - `managed`: `[ACT]` 印のある DB が 1 つ以上ある、またはトップページに `ACT 設定` があれば `true`
-   - `recorded_schema_version`: `ACT 設定` の `schema`（無ければ印の `schema=notion/<n>` の最小値）。どちらも無ければ `null`
-   - `databases`、`store_ids`（`[ACT]` 印のある DB だけを型ごとに。`project_registry` は 3 つの識別子の形）、`shared`（共通 DB の 🏢・📁・🏷・🧠 の識別子。同じワークスペースを `notion-search` で `[ACT] type=` を手がかりに探す。無ければ `null`）
-   - `migration_in_progress`: `ACT 設定` の `migrating`、または印の末尾の ` migrating`
-   - `workspace`: `notion-get-self` で得たワークスペースの識別子
-
 何も書かない。
+
+1. `location` を判別する。`https://` で始まればページの URL、それ以外は DB／データソースの識別子として `notion-fetch` で取得する。取得できなければ `not_found`。
+   - DB の識別子なら、その DB の親（プロジェクトのトップページ）を起点にする。
+   - 起点がプロジェクトのトップページ（本文に `ACT 設定` がある）なら、その親を ACT のルートとする。それ以外は起点を ACT のルートとする。
+2. **プロジェクト側**: ルートの子ページのうち、`ACT 設定` の `project_key` が `args.project_key` と一致するページを、このプロジェクトのトップページとする。一致するものが無ければ、タイトルが `ACT: <project_name>` で `ACT 設定` を持たないページを候補にする（取り込みの対象）。他の `project_key` のトップページとその DB は、プロジェクト側として扱わない。
+   - `managed`: トップページに `ACT 設定` があれば `true`
+   - `recorded_schema_version`: `ACT 設定` の `schema` の版。`schema` が空なら `null` で `partial: true`。DB の説明文の印の版はここに使わない
+   - `store_ids`: トップページの子の DB のうち `[ACT]` 印のあるものを型ごとに
+   - `missing_types`: `schema-v1.md` のプロジェクト DB のうち `store_ids` に無い型
+3. **共通側**: 共通 DB（🏢・📁・🏷・🧠）を次の順で探す。
+   1. ルートの子の DB で `[ACT]` 印の `type` が共通の型のもの。
+   2. 見つからなければ `notion-search` で `[ACT] type=` を手がかりに同じワークスペースを探す。1 組だけ見つかればそれを使う。2 組以上（別の ACT ルート）なら、選ばずに `candidates` に並べる。
+   - `recorded_schema_version`: 共通 DB の説明文の印の版（4 つで違えば最小）。無ければ `null`
+4. 印の無い DB は、名前とプロパティを `schema-v1.md` と比べて `role` を推定し、`scope` を `unknown` として `databases` に載せる（取り込みの材料）。
+5. `migration`: トップページの `ACT 設定` の `migrating`・`migrating_since`・`run_id`。共通 DB だけが移行中なら、説明文の 1 行目末尾の ` migrating <run_id> <日時>` から読む。
+6. `workspace`・`user`: `notion-get-self` から。
 
 ### `plan`
 
-`inspection`・`target_schema_version`・`mode` から変更を組み立てる。何も書かない。
+`inspection`・`target_schema_version`・`mode` から変更を組み立てる。何も書かない。プロジェクト側と共通側は別々に考える。
 
-- **新規作成**: `schema-v1.md` の全 DB・トップページ・`ACT 設定`・`種類:` タグ 7 件と `汎用` の作成を `追加` として並べる。`inspection.shared` にある共通 DB は作らず「つなぐ」変更にする。`manual_steps` に `schema-v1.md` の「手作業が必要な設定」を入れる。
-- **取り込み**: 既存の DB を `schema-v1.md` の DB に対応づける。`mapping` が渡されればそれを使い、無ければ `mapping_proposal` を作る（プロパティ名・型・値の傾向から推定し、各項目に `basis` を書く。人が足したプロパティは `ACT では使わない`）。不足するプロパティ・DB の作成を `追加`、名前を変えて使うものを `変換` とする。最後に `[ACT]` 印と `ACT 設定` を書く変更を入れる。
-- **更新**: `recorded_schema_version` から `target_schema_version` まで 1 版ずつ、`references/schema-v<n>.md` の移行手順を並べる。渡された `mapping` で既存のプロパティ名に読み替える。
+- **プロジェクト側**
+  - 新規作成（`project.managed` が偽）、または適用途中（`partial`）: トップページ（無ければ）、`ACT 設定`（無ければ）、`missing_types` の DB の作成を `追加` として並べる。最後に `ACT 設定` の `schema` を書く変更を入れる。
+  - 取り込み: 既存の DB を `schema-v1.md` の DB に対応づける。`mapping` が渡されればそれを使い、無ければ `mapping_proposal` を作る（プロパティ名・型・値の傾向から推定し、各項目に `basis` を書く。人が足したプロパティは `ACT では使わない`）。「そのまま使う」「名前を変えて使う」項目はプロパティ名を変えない（読み替えは `mapping` で行う）。足りないプロパティ・DB の作成を `追加` とし、最後に `[ACT]` 印と `ACT 設定` を書く変更を入れる。
+  - 更新: `recorded_schema_version` から `target_schema_version` まで 1 版ずつ、`references/schema-v<n>.md` の移行手順を並べる。渡された `mapping` で既存のプロパティ名に読み替える。
+- **共通側**
+  - `shared.store_ids` に揃っていれば作らない（つなぐだけ）。足りない共通 DB の作成と、版 1 の初期タグ（`種類:` 7 件と `汎用`）を `追加` にする。
+  - `shared.candidates` があれば、`shared_choice` が渡されるまで共通側の変更を作らず、`changes` に `category: 手作業`・`description: 共通 DB の候補が複数ある。どれを使うか選んで再計画する` を 1 件だけ入れる。
+  - 共通側の版が `target_schema_version` より古ければ、共通 DB の移行を 1 版ずつ並べる。
 - 変更 ID は `<分類の頭文字>-<連番>`（例: `A-1`、`C-2`）。`変換` には `samples`（実際のページ 3 件程度の変換前後）と `affected_pages` を付ける。
 - 削除は `changes` に入れない。不要なプロパティは `旧_` を付けて名前を変える `変換` にする。
+- `manual_steps` に `schema-v1.md` の「手作業が必要な設定」のうち、この計画で作る DB に関わるものを入れる。
 
 ### `apply`
 
 渡された `changes` だけを、渡された順に適用する。
 
-1. 適用の前に、トップページの `ACT 設定` の `migrating` を `true` にする（無ければ作ってから）。
+1. 移行中の印を付ける。プロジェクトのトップページ（無ければ最初に作る）の `ACT 設定`（無ければ `schema` を空にして作る）に `migrating: true`、`migrating_since`、`run_id`、`project_key` を書く。共通 DB を変えるときは、その DB の説明文の 1 行目末尾に ` migrating <run_id> <日時>` を付ける。既に別の `run_id` の印があれば何もせず `conflict` を返す（同じ `run_id` なら続ける）。
 2. 各変更を適用し、`results` に `success`／`failed`／`already_applied` を記録する。適用前に現状を読み、既に目的の状態なら書かずに `already_applied` とする（冪等）。
    - DB の作成: `schema-v1.md` のプロパティで作り、説明文の 1 行目に `[ACT] type=<型> schema=notion/<版>` を書く。ID のプロパティは接頭辞を付ける。
    - プロパティ名の変更と、同じ名前のプロパティの追加は、1 回の更新に混ぜない（元の値が失われるため）。変換は、旧名に `旧_` を付けて残す → 新しいプロパティを作る → 値を写す → 写した値を照合する、の順に別々の更新で行う。
    - タグの作成は 🏷 タグ に行を足す。既に同じ名前があれば `already_applied`。
-3. 1 つでも `failed` があれば、そこで止めて結果を返す（後の変更は適用しない）。
-4. すべて終わったら、`ACT 設定` を `{ "schema": "notion/<版>", "project_key": ..., "store_ids": ..., "migrating": false }` に更新し、`ACT 移行ログ` に 1 行追記する。途中で止めたときも `migrating` を戻し、ログに失敗を書く。
-5. `{ "results", "schema_version", "store_ids" }` を返す。
+3. 1 つでも `failed` があれば、そこで止める（後の変更は適用しない）。
+4. 終わったら（止まったときも）、`ACT 設定` の `store_ids` を今ある DB で更新し、`migrating` を `false` に戻し、共通 DB の説明文の印を外す。全部成功したときだけ `schema` に `notion/<版>` を書く。`ACT 移行ログ` に 1 行追記する（日時、`run_id`、実行者、前後の版、適用した変更 ID、失敗）。
+5. `{ "results", "schema_version", "store_ids" }` を返す。`store_ids` はプロジェクト側と共通側を合わせたもの（`project_registry` は 3 つの識別子の形）。
+
+### `clear_migration`
+
+`run_id` の印が残っている `ACT 設定` と共通 DB の説明文から印を外し、`ACT 移行ログ` に「印を外した（実行 `run_id` が途中で止まっていた）」を追記する。印の `run_id` が違えば何もせず `conflict` を返す。保存先のほかの内容は変えない。
+
+### 対応づけ（`mapping`）
+
+`query`・`get`・`create`・`update`・`link` は、`args.mapping`（正準項目 → 既存プロパティ名）があれば、その項目を既存プロパティ名で読み書きする。`mapping` に無い項目は `schema-v1.md` のプロパティ名を使う。
 
 ### `query`
 
@@ -86,7 +105,7 @@ Notion の構成（DB・プロパティ・本文テンプレート・ACT の印�
 
 ### `check_permission`
 
-Notion の権限は API で読めないため、次の順で推定する。読み取りは対象を `notion-fetch` で取得できるかで決める。書き込みは、呼び出し元が渡した役割と `act-core:store-protocol` の呼び出し元の判断に任せ、ここでは `unknown` と、手がかり（メンバー DB の自分の役割、DB の説明文の権限の記載）を `reason` に返す。実際の書き込みで拒否されたら、その操作が `permission_denied` を返す。
+Notion の権限は API で読めない。読み取りは対象を `notion-fetch` で取得できるかで `true`／`false` を返す。書き込みは試しに書くことをせず `unknown` を返し、手がかり（メンバー DB の自分の役割、DB の説明文の権限の記載）を `reason` に書く。書き込みの可否は、実際の書き込みが成功するか `permission_denied` になるかで分かる。
 
 ## エラーの変換
 
@@ -94,7 +113,7 @@ Notion の権限は API で読めないため、次の順で推定する。読�
 | --- | --- |
 | 権限が無い・共有されていない（403、restricted） | `permission_denied` |
 | ページ・DB が見つからない（404） | `not_found` |
-| `ACT 設定` の `migrating` が `true`（自分の `apply` 以外の書き込み時） | `conflict` |
+| 移行中の印が別の `run_id` で付いている | `conflict` |
 | 同時更新・レート制限で失敗（409・429） | `conflict` |
 | `put_file`・`get_file`、未対応の型 | `unsupported` |
 | 入力の形が合わない | `invalid_request` |

@@ -1,5 +1,7 @@
 # Notion スキーマ 版 1
 
+旧版。現在の版は `schema-v2.md`。版 1 の保存先を読むとき、版 1 から移すときに参照する。
+
 `act-store-notion:store` が作成・照合する Notion の構成。`describe` の `schema_version` は `1`。
 
 ## 全体の構成

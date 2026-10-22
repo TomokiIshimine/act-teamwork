@@ -20,13 +20,14 @@ description: ACT の保存先アダプタ（ローカルファイル）。プロ
 <root>/
 ├── .act/
 │   ├── project.yaml          （act-core が書く。このアダプタは読まない・書かない）
-│   ├── store-localfs.json    このアダプタの記録
-│   └── store-localfs.log     移行ログ（1 行 1 回の追記）
+│   └── store-localfs.json    このアダプタの記録
 ├── minutes/                  議事録
 ├── inputs/                   入力（要望書・データなど。種類ごとのサブフォルダ）
 ├── work/                     作業途中
 └── deliverables/             成果物（版付き）
 ```
+
+以前の版で作った `.act/store-localfs.log` は消さない（読まない・書かない）。実行の記録は呼び出し元が実行ログに残す。
 
 `store-localfs.json`: `{ "schema": "localfs/1", "project_key": "FAQ", "migrating": false, "migrating_since": null, "run_id": null, "layout": { "minutes": "minutes/{date}_{title}.md", "input": "inputs/{kind}/{title}{ext}", "working": "work/{title}{ext}", "deliverable": "deliverables/{title}_{version}{ext}" } }`
 
@@ -68,12 +69,12 @@ description: ACT の保存先アダプタ（ローカルファイル）。プロ
 1. `.act/store-localfs.json` を（無ければ `schema` を空にして）用意し、`migrating: true`、`migrating_since`、`run_id`、`project_key` を書く。既に別の `run_id` で `migrating: true` なら何もせず `conflict` を返す（同じ `run_id` なら続ける）。
 2. 各変更を順に適用する。フォルダは既にあれば `already_applied`。
 3. 失敗した変更があれば、そこで止める。
-4. 終わったら（止まったときも）`migrating` を `false` に戻す。全部成功したときだけ `schema` に `localfs/1` と確定した `layout` を書く。`store-localfs.log` に 1 行追記する（日時、`run_id`、前後の版、適用した変更 ID、失敗）。
-5. `{ "results", "schema_version", "store_ids": { "artifact_body": "<root>" } }` を返す。
+4. 終わったら（止まったときも）`migrating` を `false` に戻す。全部成功したときだけ `schema` に `localfs/1` と確定した `layout` を書く。
+5. `{ "results", "schema_version_before", "schema_version", "store_ids": { "artifact_body": "<root>" } }` を返す。
 
 ### `clear_migration`
 
-`store-localfs.json` の `run_id` が渡された `run_id` と同じなら `migrating` を `false` にし、ログに「印を外した」を追記する。違えば何もせず `conflict` を返す。
+`store-localfs.json` の `run_id` が渡された `run_id` と同じなら `migrating` を `false` にし、`{ "cleared": true, "run_id" }` を返す。違えば何もせず `conflict` を返す。
 
 ### `put_file`
 

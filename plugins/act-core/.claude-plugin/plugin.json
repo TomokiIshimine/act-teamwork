@@ -1,0 +1,5 @@
+{
+  "name": "act-core",
+  "version": "0.1.0",
+  "description": "ACTモデルのコアプラグイン。プロジェクトへの参加と保存先の初期設定（setup）、保存先アダプタの呼び出し規約（store-protocol）、書き込み計画と確認フォームの規約（write-plan）を含む。保存先への読み書きには act-store-notion などのアダプタが別に要る。"
+}

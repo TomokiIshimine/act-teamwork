@@ -54,7 +54,7 @@ color: red
 - **接続先は書く前に照合する。** 保存先へ何か書く前に、読み取りだけの `inspect` で接続先のワークスペースを確かめ、`03_setup-plan.json` 最上位の `accounts` の `workspace` と違えば何も書かずに止めて警告する（別のワークスペースに書いてしまうのを防ぐ）。既存の個人設定に `project_key` のプロジェクトがあり `accounts` を持つときは、その `workspace` とも一致することを確かめ、違えば同じく止める。最上位の `accounts` が無ければ照合できない旨を警告して止める。
 - **接続確認で止める。** 書き込みの疎通が取れない場合は、それ以降（とくに設定ファイル）を書かずに止めて警告する。
 - **スキーマ版の正は保存先側。** `project.yaml` の `schema_version` には `apply` の結果として返った版を書く。既存の `project.yaml` の値と食い違えば、保存先側の値で更新して警告する。`project.yaml` がまだ無い（新規プロジェクト作成）ときは段 4 では作らず、段 6 で作るときにこの版を書く。
-- **`project.yaml` は新規プロジェクト作成のときだけ作る。** 既にあれば内容は変えず、`schema_version` と、取り込みを適用したときの `stores.<型>.mapping` だけを更新する。作るときは `stores` に `apply` が返した `store_ids` を書く。
+- **`project.yaml` は新規プロジェクト作成のときだけ作る。** 既にあれば内容は変えず、`schema_version` と、取り込みを適用したときの `stores.<型>.mapping` だけを更新する。作るときは `stores` に `apply` が返した `store_ids` を書く。段 1 の項目が無く `apply` を呼ばなかったとき（保存先のモードが「変更なし」）は、内容案の `stores`（planner が `inspect` の `store_ids` で埋めたもの）を使う。どちらからも `stores` を埋められなければ `project.yaml` を書かずに止めて警告する。
 - **取り込みの対応づけは `project.yaml` に残す。** 段 1 で `apply` に渡した確定済みの `mapping`（段 1 の項目の `payload` の `mapping` に、変更計画フォームの `override` を反映したもの）を、型ごとに `stores.<型>.mapping` に書く（形は正準項目 → 既存プロパティ名）。次回以降の更新モードでこの対応づけを使うためで、`project.yaml` を作るとき（段 6）も、既存の `project.yaml` に取り込みを適用したとき（段 6 で該当の型の `mapping` だけを置き換える）も書く。`project.yaml` の内容案の `mapping` ではなく、`apply` に渡した値を正とする。`mapping` を渡さなかった型は変えない。
 - **個人設定は 1 件追加だけ。** `projects` に計画の個人設定の項目の `payload`（`projects` の 1 項目の形）をそのまま足すだけにし、既存の項目・`default_project`・`preferences`・`me` は変えない。書く直前にファイルを読み直してキーの重複を再確認し、同じキーがあれば書かずに止めて警告する。ファイルが無ければ次の骨格で新しく作り、`projects` に `payload` を入れる（`me` は計画に値があるときだけ入れる）。
 

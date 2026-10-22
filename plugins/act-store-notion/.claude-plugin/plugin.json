@@ -1,0 +1,5 @@
+{
+  "name": "act-store-notion",
+  "version": "0.1.0",
+  "description": "ACT の保存先アダプタ（Notion）。決定事項・タスク・ナレッジ・判断依頼・アーティファクトのメタ情報などを、本人の Notion コネクタで Notion の DB に読み書きする。act-core と一緒に使う。"
+}

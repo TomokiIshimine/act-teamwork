@@ -1,0 +1,26 @@
+{
+  "name": "act-teamwork",
+  "owner": {
+    "name": "TomokiIshimine"
+  },
+  "metadata": {
+    "description": "ACTモデル（Agentic, Context-driven Teamwork）を Claude 上で運用するためのプラグイン群"
+  },
+  "plugins": [
+    {
+      "name": "act-core",
+      "source": "./plugins/act-core",
+      "description": "ACT のコア: ワークフロー・共通エンジン・正準モデル・権限ポリシー"
+    },
+    {
+      "name": "act-store-notion",
+      "source": "./plugins/act-store-notion",
+      "description": "ACT の保存先アダプタ（Notion）"
+    },
+    {
+      "name": "act-store-localfs",
+      "source": "./plugins/act-store-localfs",
+      "description": "ACT の保存先アダプタ（ローカルファイル・共有フォルダ）"
+    }
+  ]
+}

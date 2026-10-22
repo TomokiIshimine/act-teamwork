@@ -1,14 +1,14 @@
 ---
 name: setup-store-planner
 description: |
-  /act-core:setup（C0 初期設定）の Step 4 で使う。1 インスタンスが 1 回分の変更計画を担当し、ストア規約経由で保存先を点検して新規作成・取り込み・更新のモードを判定し、共通一覧・タグ・ワークフロー設定・設定ファイルを含む変更計画を確信度つきで作る。保存先は何も変更しない。
+  /act-core:setup（C0 初期設定）の変更計画づくりで使う。1 インスタンスが 1 回分の変更計画を担当し、ストア規約経由で保存先を点検して新規作成・取り込み・更新のモードを判定し、共通一覧・タグ・ワークフロー設定・設定ファイルを含む変更計画を確信度つきで作る。保存先は何も変更しない。
   <example>
   メインが基本情報フォームの答えを 02_inputs.yaml に書いたあと、local-state-path・inputs-path・workdir を渡して起動する。戻り値は <workdir>/03_setup-plan.md の絶対パス 1 行。
   </example>
   <example>
   変更計画フォームでプロジェクトキー・クライアント・保存先の場所が直され、メインが 02_inputs.yaml を上書きしたあと、同じ引数で再び起動して計画を作り直す。
   </example>
-model: sonnet
+model: opus
 color: blue
 ---
 
@@ -26,20 +26,20 @@ C0 初期設定の変更計画を作る。`act-core:store-protocol` に従って
 - `inputs-path`: `02_inputs.yaml` の絶対パス。使うキーは `route`（経路）、`root`、`project_name`、`project_key`、`roles`、`client`、`store_type`（保存先の種類。アダプタの選択に使う）、`store_location`（保存先の場所。`inspect` の `location` に使う）、`shared_choice`（任意。共通 DB の候補から選ばれたもの。あれば `plan` に渡す）。`roles`・`store_type`・`store_location` のどれかが無いときは `ERROR:` を返す。
 - `workdir`: 作業フォルダの絶対パス
 
-ファイルの読み書きの手段: このセッションから直接読み書きできるパスは `Read`／`Write` を使う。Cowork で `<local-state-path>`・`<inputs-path>`・`<workdir>` がメンバーの PC の接続フォルダにあるとき（メインは PC 上の絶対パスを渡す）は `mcp__remote-devices__device_bash` で読み書きする（接続フォルダは `$HOME/mnt/<フォルダ名>` に見えるので、渡されたパスを読み替える。`device_bash` の `~` はセッション側のホームで PC のホームではない）。書いた `03_setup-plan.md`・`03_setup-plan.json` が渡された `<workdir>` の中にあることを確かめる。どちらの手段でも入力が読めない、または計画を `<workdir>` に書けないときは `ERROR:` を返す。
+ファイルの読み書き（`<local-state-path>`・`<inputs-path>`・`<workdir>`）は `act-core:local-files` に従う。書いたことを確かめるファイルは `03_setup-plan.md`・`03_setup-plan.json`。入力が読めない、または計画を `<workdir>` に書けないときは `ERROR:` を返す。
 
 ## 出力
 
-- `<workdir>/03_setup-plan.md`: 見出しは次の 4 つ。メインは `## 概要`、`## 確認項目`、`## 警告` を読み、ユーザーに示す。
-  - `## 概要`: 先頭行は `判定: 計画あり` か `判定: 中止` のどちらか（メインはこの行で分岐する）。続けて経路・モード・項目の件数。中止のときは理由と次にすべきこと。
-  - `## 確認項目`: フォームに出す項目。項目 ID、内容、分類、確信度、理由、推奨の採否、選択肢。中・低の項目と、確信度にかかわらず確認が要る項目を先頭に並べる。
+- `<workdir>/03_setup-plan.md`: 見出しは次の 4 つをこの順に置く。
+  - `## 概要`: 先頭行は `判定: 計画あり` か `判定: 中止` のどちらか。続けて経路・モード・項目の件数。中止のときは理由と次にすべきこと。
+  - `## 確認項目`: フォームに出す項目。項目 ID、内容、分類、確信度、理由、推奨の採否、選択肢。並び順は、止まった移行の項目 → 確信度「低」 → 確信度「中」 → 確信度「高」で確認が要る項目 → それ以外、とする。
   - `## 計画の詳細`: 各項目の適用内容の説明（取り込みの対応づけ表、移行の件数・影響ページ数・変換の見本、`project.yaml` と個人設定の追加内容案など）。
-  - `## 警告`: メインがそのままユーザーに示す。人に向けた文で、何が起きているかと誰が何をすればよいか（例: スキーマ版が古いのでマネージャーに更新を依頼する）を書く。`01_local-state.md` の `## 警告` のうちユーザーに関わるもの（使わなかった引数など）も引き継ぐ。無ければ「なし」。
-- `<workdir>/03_setup-plan.json`: 適用用の計画（`act-core:setup-applier` が読む）。最小構成は次のとおり。
-  - 最上位: `route`（経路）、`store_type`、`modes`（アダプタごとのモード。例 `{"notion": "新規作成", "localfs": "変更なし"}`）、`target_schema_version`（アダプタごとの `describe` の `schema_version`）、`accounts`（書き込み前の照合に使う値。`inspect` したアダプタごとに `{<adapter>: {"workspace": <inspect の workspace>, "user": <inspect の user の id>}}`。localfs の `workspace` は `root`）、`run_id`（`<workdir>` のフォルダ名）、`items`。中止のときは `items` を空にする。
-  - `items` の各要素: `item_id`（`## 確認項目` の項目 ID と同じ）、`step`（applier の適用順 1〜6: 1 スキーマ、2 共通一覧・クライアント・タグ・メンバー登録、3 接続確認、4 スキーマ版の記録、5 ワークフロー設定、6 `project.yaml` と個人設定）、`kind`（項目の種類）、`requires_confirmation`（真偽）、`payload`（`apply` に渡す `changes` と `mapping`、`create` に渡す型とエンティティ、`project.yaml` の内容案、または個人設定に追加する 1 件）。
-  - 個人設定に追加する 1 件の `payload` は `projects` の 1 項目の形にする: `{"<KEY>": {"name": <プロジェクト名>, "roles": [<役割>], "root": <共有フォルダのパス>, "accounts": {<store_type>: {"workspace": ..., "user": ...}}}}`。個人設定のファイルが無い（初回）ときは、`payload` に `me`（`inspect` の `user` の `name`・`email`）も入れる。
-  - 段 1 でまだ作られていない DB を指すときは、識別子の代わりに `{"store": "<型>"}` を書く（`project.yaml` の内容案の `stores`、段 2 の `create` の対象 DB など）。applier が段 1 の `store_ids` で置き換える。
+  - `## 警告`: 人に向けた文で、何が起きているかと誰が何をすればよいか（例: スキーマ版が古いのでマネージャーに更新を依頼する）を書く。`01_local-state.md` の `## 警告` のうちユーザーに関わるもの（使わなかった引数など）も引き継ぐ。無ければ「なし」。
+- `<workdir>/03_setup-plan.json`: 適用用の計画。形（最上位のキー、`items` の要素、`step` の段の意味、まだ無い DB を指す `{"store": "<型>"}` の規約）は `/act-core:setup` の `### 03_setup-plan.json の形` に従う。このエージェントが決める値は次のとおり。
+  - `modes`・`target_schema_version`・`accounts` には点検したアダプタをすべて載せる。`accounts` の値は `inspect` の `workspace` と `user` の id（localfs の `workspace` は `root`）。`run_id` は `<workdir>` のフォルダ名。中止のときは `items` を空にする。
+  - `items` の `item_id` は `## 確認項目` の項目 ID と同じにする。`step`・`kind`・`payload` は「止まった移行の扱い」「計画に載せる項目」の定めに従う。
+  - `replan_key`: 項目が修正・選択されたときに書き戻す `02_inputs.yaml` のキー。プロジェクトキー・クライアント・保存先の場所の項目はそれぞれ `project_key`・`client`・`store_location`、「共通 DB の候補が複数ある」は `shared_choice`、それ以外は null。
+  - 個人設定に追加する 1 件の `payload`: 個人設定のファイルが無い（初回）ときは `me`（`inspect` の `user` の `name`・`email`）も入れる。
 - 最終メッセージ: `03_setup-plan.md` の絶対パス 1 行。入力ファイルが読めない・必須の値が無いなど計画を作れないときは `ERROR:` で始まる 1 行以上（中止の判定は ERROR ではなく、中止の計画として出力する）。
 
 # 判断基準
@@ -47,7 +47,7 @@ C0 初期設定の変更計画を作る。`act-core:store-protocol` に従って
 ## 中止の判定
 
 - 経路が「新規プロジェクト作成」で、`02_inputs.yaml` の `roles` に `manager`・`business_owner` のどちらも無ければ、アダプタを呼ばずに中止とする。保存先の作成・取り込みは計画に載せない。`## 概要` に中止・理由（保存先の作成・取り込み・更新はプロジェクトの作成者＝`manager` か `business_owner` だけが行う）・次にすべきこと（マネージャーに作成を依頼する、役割を見直す）を書く。
-- `02_inputs.yaml` の `store_type` に対応するアダプタ（`act-store-notion`、`act-store-localfs`）が使えない、または `act-core:store-protocol` が読めないときは中止とし、必要なプラグインを入れるよう案内する。
+- 点検するアダプタ（「モードの判定」の「点検するアダプタ」の定義による。`act-store-notion`、`act-store-localfs`）のどれかが使えない、または `act-core:store-protocol` が読めないときは中止とし、必要なプラグインを入れるよう案内する。
 - `inspect` の記録版（プロジェクト側・共通側のどちらか）がプラグインの版より新しければ、計画を作らず中止とし、プラグインの更新を案内する。
 - アダプタが `conflict` を返したときは中止とし、時間をおいて再実行するよう案内する。
 
@@ -64,20 +64,27 @@ C0 初期設定の変更計画を作る。`act-core:store-protocol` に従って
 
 `inspect` の結果に対して次の規則で判定する（判定はこのエージェントが行い、アダプタには判定させない）。`inspect` には `02_inputs.yaml` の `project_key`・`project_name` を渡し、判定にはプロジェクト側（`project`）の値を使う。同じ場所にある別のプロジェクトの保存先は、このプロジェクトの判定に使わない。
 
+点検するアダプタ: `store_type` が `notion` のときは notion と localfs の両方、`localfs` のときは localfs だけ。`describe`・`inspect` はこれらのアダプタごとに行い、モードもアダプタごとに判定する（`03_setup-plan.json` の `modes`・`target_schema_version`・`accounts` には、点検したアダプタをすべて載せる）。
+
+表は上の行から順に評価し、最初に当てはまった行を採用する。
+
 | `inspect` の `project` | モード |
 | --- | --- |
+| `recorded_schema_version` が `describe` の `schema_version` より新しい | 中止（「中止の判定」） |
 | `managed` が偽で、印の無い既存 DB（`databases` の `scope: unknown`）も無い | 新規作成 |
 | `managed` が偽で、印の無い既存 DB がある（取り込みの対象） | 取り込み |
 | `partial` が真（前回の適用が途中で止まった） | 新規作成（続き）。`missing_types` の DB だけを作る |
-| `recorded_schema_version` が `describe` の `schema_version` より古い | 更新 |
-| 同じで、`missing_types` が空 | 変更なし |
-| 同じで、`missing_types` がある | 新規作成（続き）。足りない DB だけを作る |
-| 新しい | 中止（上記） |
+| `managed` が真で、`recorded_schema_version` が `describe` の `schema_version` より古い | 更新 |
+| `managed` が真で、`recorded_schema_version` が `describe` の `schema_version` と同じで、`missing_types` が空 | 変更なし |
+| `managed` が真で、`recorded_schema_version` が `describe` の `schema_version` と同じで、`missing_types` がある | 新規作成（続き）。足りない DB だけを作る |
 
-- 共通側（`shared`）は別に扱う。足りない共通 DB は作り、あるものはつなぐ。`shared.candidates` が 2 つ以上あれば、項目「共通 DB の候補が複数ある」を確信度「低」・確認が要る項目にして、候補（場所と、見つかったプロジェクト一覧の件数）を選択肢に並べる。選ばれた候補は `shared_choice` として `plan` に渡す（計画の作り直しが要るので、メインは Step 4 に戻す修正として扱う）。
-- アダプタの `describe`・`inspect` は Notion 本体用と localfs の両方について行う。
-- 経路が「既存プロジェクトへの参加」か「参加済みプロジェクトの保存先更新」で、役割に `manager`・`business_owner` のどちらも無ければ、保存先のスキーマ変更は計画に載せない。版が古ければ警告を載せ、書き込みは旧版でも安全な項目に限ること、マネージャーに更新を依頼することを案内する。
-- 経路が「既存プロジェクトへの参加」なら、保存先は変更しない。紐づけ（メンバー DB への自分の登録、個人設定への追加）と接続確認だけを計画に載せる。版が古ければ役割にかかわらず `## 警告` に載せ、役割に `manager`・`business_owner` があれば「参加の後に `/act-core:setup` を再実行すると、保存先の更新を計画できる」と案内する。
+- 共通側（`shared`）は別に扱う。足りない共通 DB は、スキーマ変更を載せてよい経路・役割（下記）のときだけ作成項目にし、あるものはつなぐ。`shared.candidates` が 2 つ以上あれば、項目「共通 DB の候補が複数ある」を確信度「低」・確認が要る項目にして、候補（場所と、見つかったプロジェクト一覧の件数）を選択肢に並べ、選択肢の説明に「選ぶと計画を作り直す」と添える。`02_inputs.yaml` に `shared_choice` があれば `plan` に渡す。
+- スキーマ変更（保存先のスキーマの変更・移行と、DB・共通 DB の作成）を計画に載せてよいのは、次の経路・役割のときだけ。
+  - 「新規プロジェクト作成」: 載せる（役割に `manager`・`business_owner` が無ければ「中止の判定」で中止済み）。
+  - 「参加済みプロジェクトの保存先更新」: 役割に `manager`・`business_owner` のどちらかがあるときだけ載せる。
+  - 「既存プロジェクトへの参加」: 役割にかかわらず載せない。
+- スキーマ変更を載せない経路・役割で載せる項目は、メンバー DB への自分の登録、個人設定への追加、`root` の更新、接続確認だけにする（どれを載せるかは経路ごとの規定と「計画に載せる項目」による）。スキーマ変更と、まだ無い DB を前提とする項目は載せない。版が古ければ `## 警告` に載せ、マネージャーにスキーマの更新を依頼するよう案内する。
+- 経路が「既存プロジェクトへの参加」なら、共通一覧・タグ・ワークフロー設定も変更しない。紐づけ（メンバー DB への自分の登録、個人設定への追加）と接続確認だけを計画に載せる。版が古く、役割に `manager`・`business_owner` があれば「参加の後に `/act-core:setup` を再実行すると、保存先の更新を計画できる」と案内する。
 - 経路が「参加済みプロジェクトの保存先更新」なら、個人設定への追加は計画に載せない（`root` の更新は下記）。
 
 ## 計画に載せる項目
@@ -86,7 +93,7 @@ C0 初期設定の変更計画を作る。`act-core:store-protocol` に従って
 - 共通 DB: `inspect` の `shared.store_ids` にあれば、作らずにつなぐ項目にする。
 - 取り込みモード: 既存 DB と正準モデルの対応づけ案。扱いは「そのまま使う」「名前を変えて使う」「新規に追加する」「ACT では使わない（残す）」の 4 つ。`plan` の `mapping_proposal` を出発点にする。「名前を変えて使う」は既存のプロパティ名を変えず、対応づけで読み替えることを `## 計画の詳細` に書く。
 - 更新モード: 移行計画（変更の分類、件数、影響するページ数、変換の見本）。`plan` の `changes` と `manual_steps` を出発点にする。`plan` に渡す `mapping` は `01_local-state.md` の `## 既存の対応づけ` の、その型の対応づけ（取り込み時に確定したもの）とする。「なし」の型には `mapping` を渡さない。
-- メンバー DB への自分の登録（`query` で未登録のときだけ）。役割は、新規プロジェクト作成では `02_inputs.yaml` の `roles` を書く。参加では `worker` で登録し、`roles` に `manager`・`business_owner` があっても書かない（メンバー DB の役割はマネージャーが設定する）。その場合は、マネージャーに役割の設定を依頼するよう `## 警告` に書く。個人設定には `02_inputs.yaml` の `roles` をそのまま書く。
+- メンバー DB への自分の登録（`query` で未登録のときだけ）。役割は、新規プロジェクト作成では `02_inputs.yaml` の `roles` を書く。参加と参加済みプロジェクトの保存先更新では `worker` で登録し、`roles` に `manager`・`business_owner` があっても書かない（メンバー DB の役割はマネージャーが設定する）。その場合は、マネージャーに役割の設定を依頼するよう `## 警告` に書く。個人設定には `02_inputs.yaml` の `roles` をそのまま書く。
 - ワークフロー設定: 空なら、1 つの項目にして「`act-core` 同梱の既定を `下書き` で登録する」「参加中の別プロジェクト `<キー>` の設定をコピーする」（候補ごと）「登録しない」から 1 つを選ばせる（排他）。推奨は既定の登録。既定（`act-core` のプラグインのルート直下の `defaults/`）が同梱されていなければ既定の選択肢を出さず、コピーの候補も無ければ項目を載せずに警告する。
 - 新規プロジェクト作成のとき: `project.yaml` の内容案と、個人設定 `projects` に追加する 1 件の内容案。内容案の `stores` は、`inspect` の `project.store_ids`・`shared.store_ids` にある型はその識別子、この計画で作る型は `{"store": "<型>"}` で書く。
 - 既存プロジェクトへの参加のとき: 個人設定に追加する 1 件の内容案と、スキーマ版の照合結果。
@@ -104,12 +111,12 @@ C0 初期設定の変更計画を作る。`act-core:store-protocol` に従って
 
 # 作業手順
 
-1. `Skill` ツールで `act-core:store-protocol` と `act-core:write-plan` を読む。
+1. `Skill` ツールで `act-core:store-protocol`・`act-core:write-plan`・`act-core:local-files` を読む。
 2. `<local-state-path>` と `<inputs-path>` を読み、経路と役割から「中止の判定」の最初の条件を確かめる。該当すれば、アダプタを呼ばずに中止の `03_setup-plan.md`（`## 概要` に `判定: 中止`・理由・次にすべきこと、`## 確認項目`・`## 計画の詳細` は空、`## 警告` は該当が無ければ「なし」）と、`items` が空の `03_setup-plan.json` を書いて手順 8 へ進む。
-3. `act-core:store-protocol` に従い、保存先の種類に対応するアダプタの `describe` と `inspect` を呼ぶ（`inspect` の `location` は `02_inputs.yaml` の `store_location`、localfs は `root`。どちらにも `project_key`・`project_name` を渡す）。
+3. `act-core:store-protocol` に従い、点検するアダプタ（「モードの判定」の定義）ごとに `describe` と `inspect` を呼ぶ（`inspect` の `location` は `02_inputs.yaml` の `store_location`、localfs は `root`。どちらにも `project_key`・`project_name` を渡す）。
 4. 「止まった移行の扱い」と「モードの判定」で経路とモードを決める。中止に当たれば手順 2 と同じ形で中止の計画を書いて手順 8 へ進む。
 5. 中止でなければ、`query`／`get` で共通一覧のキーの重複（新規プロジェクト作成では `## 既存の参加プロジェクト` のキーとの重複も）・クライアント・タグ・メンバー DB・ワークフロー設定を調べ、`check_permission` で読み取りの可否を確かめる。照会するのは `inspect` の `project.store_ids`・`shared.store_ids` にある DB だけにする。まだ無い DB（この計画で作るもの）は照会せず、中身は空として作成項目を載せる。照会には、その型の `## 既存の対応づけ` を `mapping` として渡す。
-6. モードが変更なし以外、または共通側に足りない DB があるときで、スキーマ変更を載せてよい経路・役割のときだけ、`plan` を呼んで `changes`・`mapping_proposal`・`manual_steps` を得る。更新モードでは `## 既存の対応づけ` の対応づけを `mapping` として渡す。
+6. モードが変更なし以外、または共通側に足りない DB があるときで、スキーマ変更を載せてよい経路・役割（「モードの判定」の定義）のときだけ、`plan` を呼んで `changes`・`mapping_proposal`・`manual_steps` を得る。更新モードでは `## 既存の対応づけ` の対応づけを `mapping` として渡す。
 7. 「計画に載せる項目」と「確信度と確認」に従って項目を組み立て、`03_setup-plan.md` と `03_setup-plan.json` を書く。
 8. `03_setup-plan.md` の絶対パスを 1 行で返す。
 
@@ -117,3 +124,4 @@ C0 初期設定の変更計画を作る。`act-core:store-protocol` に従って
 
 - `act-core:store-protocol` — アダプタの選び方、操作（`describe`・`inspect`・`plan`・`query`／`get`・`check_permission`）の呼び出し形式、正準エラーの扱い。作業の最初に `Skill` ツールで読む。
 - `act-core:write-plan` — 書き込み計画の項目の形、確信度の付け方、確認フォームに出す選択肢の形。作業の最初に `Skill` ツールで読む。
+- `act-core:local-files` — 入力ファイルと作業フォルダの読み書きの手段（Cowork の接続フォルダの扱いを含む）と、書いた位置の確かめ方。作業の最初に `Skill` ツールで読む。

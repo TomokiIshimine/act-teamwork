@@ -12,7 +12,7 @@ description: ACT の保存先アダプタ（ローカルファイル）。プロ
 - `root` は共有フォルダの絶対パス。呼び出し元が渡す（`inspect` の `location`、それ以外は `args.root`）。
 - ファイルの読み書きの手段: このセッションから直接読み書きできるパスは `Read`／`Write`／`Bash` を使う。Cowork で `root` がメンバーの PC の接続フォルダにあるときは `mcp__remote-devices__device_bash` を使う（接続フォルダは `$HOME/mnt/<フォルダ名>` に見えるので、渡されたパスを読み替える。`device_bash` の `~` はセッション側のホーム）。どちらでも読めなければ `not_found`、書けなければ `permission_denied` を返す。
 - 現在の版は `1`。
-- 共有フォルダの外には書かない。ファイルを削除しない。既存のファイルを上書きしない（下記の版の規則で別名にする）。
+- 共有フォルダの外には書かない。ファイルを削除しない。既存のファイルを上書きしてよいのは作業途中（`working`）だけ。それ以外は下記の版の規則で別名にする（要件 §4.6「版の残し方」）。
 
 ## 版 1 の構成
 
@@ -78,12 +78,17 @@ description: ACT の保存先アダプタ（ローカルファイル）。プロ
 
 ### `put_file`
 
-`args`: `root`、`category`（`minutes`／`input`／`working`／`deliverable`）、`fields`（`date`・`title`・`kind`・`ext`・`version` のうち `layout` が使うもの）、`content`（テキスト）または `source_path`（コピー元のファイル）。
+`args`: `root`、`category`（`minutes`／`input`／`working`／`deliverable`）、`fields`（`date`・`title`・`kind`・`ext`・`version` のうち `layout` が使うもの）、`content`（テキスト）または `source_path`（コピー元のファイル）、`expected_hash`（任意。`working` を上書きするとき、呼び出し元が前に読んだ・書いたときのハッシュ）。
+
+レビューに出す・承認・提出の節目で版を固定するときは、`category: deliverable`、`fields.version` に新しい版、`source_path` に作業途中のファイルを渡して版付きの写しを作る。
 
 1. `layout` から相対パスを作る。ファイル名に使えない文字（`/ \ : * ? " < > |`）は全角に置き換える。
-2. 同じパスにファイルがあれば、内容のハッシュが同じなら書かずにそのパスを返す（二重取り込みの防止）。違えば上書きせず、`deliverable` は `version` を上げるよう `conflict` を返し、それ以外は末尾に `_2`、`_3`… を付けた名前で書く。
+2. 同じパスにファイルがあれば、内容のハッシュが同じなら書かずにそのパスを返す（二重取り込みの防止）。違えば分類ごとに次のようにする。
+   - `working`: 上書きする。ただし `expected_hash` が渡されていて今のファイルのハッシュと違えば、人が後から編集したので書かずに `conflict` を返す（`current_hash` を添える）
+   - `deliverable`: 上書きせず、`version` を上げるよう `conflict` を返す（版付きの写しは以後変えない）
+   - `minutes`・`input`: 上書きせず、末尾に `_2`、`_3`… を付けた名前で書く（清書した議事録と入力の原本は確定扱い）
 3. 書いた内容の SHA-256 を計算する。
-4. `{ "location": <root からの相対パス>, "hash": "sha256:<16 進>" }` を返す。
+4. `{ "location": <root からの相対パス>, "hash": "sha256:<16 進>" }` を返す。`working` を上書きしたときは `previous_hash`（上書き前のハッシュ）も返す。
 
 ### `get_file`
 
@@ -101,6 +106,6 @@ description: ACT の保存先アダプタ（ローカルファイル）。プロ
 | --- | --- |
 | 書き込みが拒否された（読み取り専用、権限なし、接続フォルダの外） | `permission_denied` |
 | `root` やファイルが無い | `not_found` |
-| 移行中の印が別の `run_id` で付いている、同名の成果物が別の内容で既にある | `conflict` |
+| 移行中の印が別の `run_id` で付いている、同名の成果物が別の内容で既にある、作業途中のファイルが `expected_hash` の後に編集されている | `conflict` |
 | 扱わない操作・型 | `unsupported` |
 | 入力の形が合わない | `invalid_request` |

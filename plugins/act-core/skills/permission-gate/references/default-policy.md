@@ -51,6 +51,13 @@
 | `artifact_register` | アーティファクトの登録・新しい版 | business_owner, manager, worker | 確定で書く | 書かない（コメントのみ） | 可 | |
 | `artifact_approve` | アーティファクトを「承認済み」にする | business_owner, manager | 確定で書く | 判断依頼にする（宛先 `manager`） | 可 | `policy.artifact_approve` で置き換える |
 
+## 議事録（`minutes`）
+
+| キー | 対象・操作 | 許す役割 | 許すとき | 許さないとき | 上書き | 備考 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `minutes_create` | 議事録の作成（C1）・原文と訂正履歴への追記 | business_owner, manager, worker | 確定で書く | 書かない（コメントのみ） | 可 | 決定・宿題の書き方は決定事項・タスクの行で別に判定する |
+| `minutes_revoke` | 議事録を「取消」にする | business_owner, manager | 確定で書く | 書かない（コメントのみ） | 可 | |
+
 ## 置き場所（アーティファクト本体の置き場所と索引）
 
 | キー | 対象・操作 | 許す役割 | 許すとき | 許さないとき | 上書き | 備考 |

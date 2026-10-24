@@ -1,6 +1,6 @@
 ---
 name: store
-description: ACT の保存先アダプタ（ローカルファイル）。プロジェクトの共有フォルダ（Google ドライブ等の同期先）にアーティファクト本体を置く。act-core のスキル・エージェントが act-core:store-protocol に従って保存先の種類 localfs の操作（describe・inspect・plan・apply・put_file・get_file・check_permission・list_folders・create_folder・update_index）を依頼したときに読み、共有フォルダで実行して JSON で返す。依頼例:「act-store-localfs で共有フォルダを inspect して」「議事録の本体を共有フォルダに put_file して」「/act-store-localfs:store」。
+description: ACT の保存先アダプタ（ローカルファイル）。プロジェクトの共有フォルダ（Google ドライブ等の同期先）にアーティファクト本体を置く。act-core のスキル・エージェントが act-core:store-protocol に従って保存先の種類 localfs の操作（describe・inspect・plan・apply・put_file・get_file・check_permission・list_folders・create_folder・update_index）を依頼したときに読み、共有フォルダで実行して JSON で返す。依頼例:「act-store-localfs で共有フォルダを inspect して」「議事録の原文を共有フォルダに put_file して」「/act-store-localfs:store」。
 ---
 
 # store — ローカルファイルアダプタ
@@ -22,7 +22,7 @@ description: ACT の保存先アダプタ（ローカルファイル）。プロ
 ├── .act/
 │   ├── project.yaml          （act-core が書く。このアダプタは読まない・書かない）
 │   └── store-localfs.json    このアダプタの記録
-├── minutes/                  議事録
+├── minutes/                  元の場所が無い議事録の原文（貼り付け・共有ルート外の添付）
 ├── inputs/                   入力（要望書・データなど。種類ごとのサブフォルダ）
 ├── work/                     作業途中
 ├── deliverables/             成果物（版付き）
@@ -38,9 +38,9 @@ description: ACT の保存先アダプタ（ローカルファイル）。プロ
 
 以前の版で作った `.act/store-localfs.log` は消さない（読まない・書かない）。実行の記録は呼び出し元が実行ログに残す。
 
-`store-localfs.json`: `{ "schema": "localfs/1", "project_key": "FAQ", "migrating": false, "migrating_since": null, "run_id": null, "layout": { "minutes": "minutes/{date}_{title}.md", "input": "inputs/{kind}/{title}{ext}", "working": "work/{title}{ext}", "deliverable": "deliverables/{title}_{version}{ext}" } }`
+`store-localfs.json`: `{ "schema": "localfs/1", "project_key": "FAQ", "migrating": false, "migrating_since": null, "run_id": null, "layout": { "minutes": "minutes/{date}_{title}_原文{ext}", "input": "inputs/{kind}/{title}{ext}", "working": "work/{title}{ext}", "deliverable": "deliverables/{title}_{version}{ext}" } }`
 
-配置規則（`layout`）は `project.yaml` の `stores.artifact_body.layout` が正。呼び出し元が `args.layout` で渡せばそれを使い、無ければ上の既定を使う。`layout` の変数は `{date}`・`{title}`・`{kind}`・`{ext}`・`{version}` と `{folder}`（`folder_root` からの `/` 区切りの相対パス。例: `library/{folder}/{title}{ext}`）。スキーマ版は `1` のまま（`store-localfs.json` の形は変えない）。
+配置規則（`layout`）は `project.yaml` の `stores.artifact_body.layout` が正。呼び出し元が `args.layout` で渡せばそれを使い、無ければ上の既定を使う。`layout` の変数は `{date}`・`{title}`・`{kind}`・`{ext}`・`{version}` と `{folder}`（`folder_root` からの `/` 区切りの相対パス。例: `library/{folder}/{title}{ext}`）。スキーマ版は `1` のまま（`store-localfs.json` の形は変えない）。既定の変更で既存のファイルは動かさず、既に書かれた `store-localfs.json` の `layout` も書き換えない（正は `project.yaml`）。
 
 ## 操作
 
@@ -95,7 +95,7 @@ description: ACT の保存先アダプタ（ローカルファイル）。プロ
 2. 同じパスにファイルがあれば、内容のハッシュが同じなら書かずにそのパスを返す（同じ内容を二重に置かない）。違えば分類ごとに次のようにする。
    - `working`: `expected_hash` が渡されていて今のファイルのハッシュと同じときだけ上書きする。`expected_hash` と違えば人が後から編集したので、書かずに `conflict` を返す（`current_hash` を添える）。`expected_hash` が無いときも上書きせず `conflict` を返す（同じフォルダに用途の違う同名ファイルが並ぶため、別のファイルを上書きしないようにする）
    - `deliverable`: 上書きせず、`version` を上げるよう `conflict` を返す（版付きの写しは以後変えない）
-   - `minutes`・`input`: 上書きせず、末尾に `_2`、`_3`… を付けた名前で書く（清書した議事録と入力の原本は確定扱い）
+   - `minutes`・`input`: 上書きせず、末尾に `_2`、`_3`… を付けた名前で書く（議事録の原文と入力の原本は確定扱い）
 3. 書いた内容の SHA-256 を計算する。
 4. `{ "location": <root からの相対パス>, "hash": "sha256:<16 進>" }` を返す。`working` を上書きしたときは `previous_hash`（上書き前のハッシュ）も返す。
 

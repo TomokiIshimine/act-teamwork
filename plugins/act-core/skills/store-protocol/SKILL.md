@@ -43,7 +43,9 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
 }
 ```
 
-型は `decision`、`task`、`knowledge`、`artifact_meta`、`run_log`、`daily_summary`、`project_registry`、`client`、`tag`、`membership`、`workflow_config`。
+型は `decision`、`task`、`knowledge`、`artifact_meta`、`minutes`、`run_log`、`daily_summary`、`project_registry`、`client`、`tag`、`membership`、`workflow_config`。
+
+議事録（要件 §4.6.1）は型 `minutes` で 1 会議 1 件とし、`create`・`get`・`query`・`update`・`link` で扱う。原文はアーティファクトに登録せず、写さずに元の場所を指す（属性 `transcript_source`・`transcript_location`・`transcript_hash`）。`put_file` の分類 `minutes` は、元の場所が無い原文（貼り付け、共有ルートの外から添付したファイル）を置くときだけ使う。決定・タスクからは属性 `source_minutes` でたどる。
 
 判断依頼は `task` の `kind: request`（`kind` は `defined`／`auxiliary`／`request`）で表し、属性 `to_role`（宛先の役割: `manager`／`business_owner`）・`request_result`（判断の結果: 承認／却下）・`affected_tasks`（影響するタスクの ID）を持つ。
 
@@ -63,7 +65,7 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
 | `link` | `from`、`to`、`relation` | なし |
 | `comment` | `type`、`id`、`body` | なし |
 | `check_permission` | `type`、`op`、`id`（任意） | `allowed`（`true`／`false`／`unknown`）、`reason` |
-| `put_file` | `root`、`category`（`minutes`／`input`／`working`／`deliverable`）、`fields`（`date`・`title`・`kind`・`ext`・`version`・`folder` のうち `layout` が使うもの。`folder` は `layout` が `{folder}` を使うときの置き場所の `folder_root` からの相対パス）、`content`（テキスト）または `source_path`（コピー元のファイル）、`expected_hash`（任意。作業途中のファイルを上書きするとき、呼び出し元が前に読んだ・書いたときのハッシュ）、`layout`・`folder_root`（`project.yaml` の `stores.artifact_body` の値） | `location`（`root` からの相対パス）、`hash`。上書きしたときは `previous_hash`（上書き前のハッシュ）も返す。`expected_hash` が今のファイルと合わず書けないときは `conflict`（`error` に `current_hash` を添える） |
+| `put_file` | `root`、`category`（`minutes`／`input`／`working`／`deliverable`）、`fields`（`date`・`title`・`kind`・`ext`・`version`・`folder` のうち `layout` が使うもの。`folder` は `layout` が `{folder}` を使うときの置き場所の `folder_root` からの相対パス）、`content`（テキスト）または `source_path`（コピー元のファイル）、`expected_hash`（任意。作業途中のファイルを上書きするとき、呼び出し元が前に読んだ・書いたときのハッシュ）、`layout`・`folder_root`（`project.yaml` の `stores.artifact_body` の値）。`category` の `minutes` は議事録の原文（文字起こし）専用で、上書きしない | `location`（`root` からの相対パス）、`hash`。上書きしたときは `previous_hash`（上書き前のハッシュ）も返す。`expected_hash` が今のファイルと合わず書けないときは `conflict`（`error` に `current_hash` を添える） |
 | `get_file` | `root`、`location`（`root` からの相対パス） | テキストなら `content`、そうでなければ `size`・`hash` |
 | `list_folders` | `root`、`folder_root` | `folders: [{path, purpose, files, folders}]`（置き場所の木。`folder_root` からの相対パス・目的の 1 行・直下のファイル数とフォルダ数） |
 | `create_folder` | `root`、`folder_root`、`path`（`folder_root` からの相対パス）、`purpose`（目的の 1 行） | `path`。既にあれば `already_applied`。親が無ければ `not_found`（親から順に作る）。親の索引にフォルダの行を足す |
@@ -127,7 +129,7 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
 
 ### `plan` の出力
 
-- `changes`: 変更の配列。各要素は `change_id`、`target`（対象 DB）、`category`（`追加`／`変換`／`削除`／`手作業`）、`description`、`affected_pages`（影響するページ数）、`samples`（変換の見本。変換のときだけ）、`adopt`（印の無い既存の共通の保存先を取り込む変更のときだけ。`{ "type", "database" }`）。
+- `changes`: 変更の配列。各要素は `change_id`、`target`（対象 DB）、`category`（`追加`／`変換`／`削除`／`手作業`）、`description`、`affected_pages`（影響するページ数）、`samples`（変換の見本。変換のときだけ）、`adopt`（印の無い既存の共通の保存先を取り込む変更のときだけ。`{ "type", "database" }`）、`targets`（任意。行ごとに写す変換のときの対象の全件。各要素は `id`・`title`・`url`・`note`（その行の変換で人が知るべきこと 1 行。移行で値を空にし、移行後に人が記入する必要がある行は、先頭を `要記入: ` で始め、続けて空にする項目名を書く。それ以外の行は `要記入:` で始めない））。
 - `mapping_proposal`: 取り込みのときの対応づけ案。各要素は `type`（型）、`canonical`（正準項目）、`existing`（既存プロパティ名。無ければ `null`）、`treatment`（`そのまま使う`／`名前を変えて使う`／`新規に追加する`／`ACT では使わない`）、`basis`（根拠）。
 - `manual_steps`: API で設定できず人の作業が要る手順（行単位の権限ルールなど）。
 - `prefix_conflicts`: 作ろうとした保存先の ID の接頭辞が使用済みで、その作成を `changes` から外したもの。各要素は `prefix`、`type`、`used_by`（使っている保存先の `database`・`name`・`url`・`marked`・`type`）、`resolution`（`adopt`＝その保存先を取り込めば解消／`change_key`＝プロジェクトキーを変えれば解消／`manual`＝人が保存先側で直すまで解消しない）。無ければ空。
@@ -181,6 +183,8 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
 | 進捗ログ、経緯 | `append`（日付付き）。過去の行は変えない |
 | 完了条件 | チェック状態の変更だけ。条件の追加・変更はマネージャーの操作 |
 | 実行ログ | 作成時に書く。同じ `run_id` の続きだけが置き換える |
+| 議事録の清書（要点・議題・決定事項・宿題・持ち帰り・要確認） | 作成時に書く。状態が確定になった後は AI は書き換えない。訂正は原文と訂正履歴に追記 |
+| 原文と訂正履歴 | 末尾に日付付きで `append`。過去の行は変えない |
 | その他のセクション | 作成時に書く。以降の変更は書き込み計画で差分を示して確認を取る |
 | テンプレートに無い見出し・段落 | 人が足したものとして残す。消さない |
 

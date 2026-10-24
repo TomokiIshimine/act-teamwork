@@ -1,6 +1,6 @@
 ---
 name: store-protocol
-description: act-core のワークフローやサブエージェントが保存先アダプタ（act-store-notion、act-store-localfs など）を呼ぶときの規約。保存先の種類からアダプタを選ぶ規則、操作（describe・inspect・plan・apply・query・get・create・update・link・comment・check_permission・put_file・get_file）の呼び出し形式と入出力、正準モデルの JSON の形、正準エラーの扱い、書き込み前の接続先の照合を定める。act-core のスキル・エージェントが「act-core:store-protocol に従って」と指示されたときに読む。依頼例:「保存先のアダプタの呼び方は」「inspect の入出力は」「permission_denied が返ったらどうする」「/act-core:store-protocol」。
+description: act-core のワークフローやサブエージェントが保存先アダプタ（act-store-notion、act-store-localfs など）を呼ぶときの規約。保存先の種類からアダプタを選ぶ規則、操作（describe・inspect・plan・apply・query・get・create・update・link・comment・check_permission・put_file・get_file・list_folders・create_folder・update_index）の呼び出し形式と入出力、正準モデルの JSON の形、正準エラーの扱い、書き込み前の接続先の照合を定める。act-core のスキル・エージェントが「act-core:store-protocol に従って」と指示されたときに読む。依頼例:「保存先のアダプタの呼び方は」「inspect の入出力は」「permission_denied が返ったらどうする」「/act-core:store-protocol」。
 ---
 
 # store-protocol — 保存先アダプタの呼び出し規約
@@ -63,9 +63,34 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
 | `link` | `from`、`to`、`relation` | なし |
 | `comment` | `type`、`id`、`body` | なし |
 | `check_permission` | `type`、`op`、`id`（任意） | `allowed`（`true`／`false`／`unknown`）、`reason` |
-| `put_file` / `get_file` | `path`、`content`／`version` | `location`、`hash` |
+| `put_file` | `root`、`category`（`minutes`／`input`／`working`／`deliverable`）、`fields`（`date`・`title`・`kind`・`ext`・`version`・`folder` のうち `layout` が使うもの。`folder` は `layout` が `{folder}` を使うときの置き場所の `folder_root` からの相対パス）、`content`（テキスト）または `source_path`（コピー元のファイル）、`expected_hash`（任意。作業途中のファイルを上書きするとき、呼び出し元が前に読んだ・書いたときのハッシュ）、`layout`・`folder_root`（`project.yaml` の `stores.artifact_body` の値） | `location`（`root` からの相対パス）、`hash`。上書きしたときは `previous_hash`（上書き前のハッシュ）も返す。`expected_hash` が今のファイルと合わず書けないときは `conflict`（`error` に `current_hash` を添える） |
+| `get_file` | `root`、`location`（`root` からの相対パス） | テキストなら `content`、そうでなければ `size`・`hash` |
+| `list_folders` | `root`、`folder_root` | `folders: [{path, purpose, files, folders}]`（置き場所の木。`folder_root` からの相対パス・目的の 1 行・直下のファイル数とフォルダ数） |
+| `create_folder` | `root`、`folder_root`、`path`（`folder_root` からの相対パス）、`purpose`（目的の 1 行） | `path`。既にあれば `already_applied`。親が無ければ `not_found`（親から順に作る）。親の索引にフォルダの行を足す |
+| `update_index` | `root`、`folder_root`、`folder`（`folder_root` からの相対パス。根は `""`）、`upsert: [<索引の行>]`（下記「索引の行」）、`purpose`（索引がまだ無いときだけ使う） | `folder`、`hash`（書いた索引のハッシュ） |
 
 `query` は属性だけで絞り込み、属性だけを返す。記述が要るときだけ `get` で取る。
+
+ハッシュ（`hash`・`previous_hash`・`current_hash`、メタ情報の `content_hash`）はどれも `sha256:<16 進>`（内容の SHA-256）の形にする。
+
+置き場所の操作（`list_folders`・`create_folder`・`update_index`）は、`artifact_body` の型を扱うアダプタのうち、`describe` の `ops` に載せたものだけが持つ。`folder_root`・`layout` には `project.yaml` の `stores.artifact_body` の値を渡す。
+
+### 索引の行
+
+`update_index` の `upsert` の 1 要素。置き場所の直下にある 1 件（ファイルまたは置き場所）ごとに 1 行。
+
+| キー | 値 |
+| --- | --- |
+| `name` | 直下のファイル名または置き場所の名前（区切りの `/` は付けない）。行はこの値で照合し、あれば置き換え、無ければ足す |
+| `type` | `file`／`folder` |
+| `summary_line` | 内容を表す 1 行 |
+| `kind` | ファイルの種類。置き場所は `null` |
+| `status` | 状態 |
+| `version` | 版。無ければ `null` |
+| `updated` | 更新日（`YYYY-MM-DD`） |
+| `meta_url` | メタ情報（📄 アーティファクト）のページの URL。無ければ `null` |
+
+値が無いキーは `null` にする。`upsert` に無い直下の項目と、索引にあって直下から無くなった項目は、アダプタが `status` を `未登録`／`見つからない` にした行で揃える（行は消さない）。各値に何を入れるかは呼び出し元の規約（`act-core:artifact-placement`）が決める。
 
 ### 対応づけ（`mapping`）は読み替えに使う
 
@@ -173,7 +198,7 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
 
 ## 書き込み前の接続先の照合
 
-保存先の接続（Notion コネクタなど）は 1 つのワークスペースにしかつながらないことがある。書き込み（`apply`・`create`・`update`・`link`・`comment`・`put_file`）の前に、`inspect` の `workspace` を、照合する値と比べる。違えば書かずに止め、接続先を切り替えるよう案内する。
+保存先の接続（Notion コネクタなど）は 1 つのワークスペースにしかつながらないことがある。書き込み（`apply`・`create`・`update`・`link`・`comment`・`put_file`・`create_folder`・`update_index`）の前に、`inspect` の `workspace` を、照合する値と比べる。違えば書かずに止め、接続先を切り替えるよう案内する。
 
 - 照合する値は、ふだんは個人設定 `~/.act/config.yaml` の `projects.<キー>.accounts.<adapter>.workspace`。
 - 初期設定のように個人設定にまだその値が無いときは、呼び出し元が持つ値（初期設定なら変更計画の `accounts.<adapter>.workspace`）を使う。この場合の照合は「計画を作った後に接続先が変わっていないか」の確認になる。
@@ -184,3 +209,4 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
 - 認証情報（トークン・パスワード）を、依頼・結果・ログ・設定ファイルに書かない。保存先への認証は各コネクタの接続に任せる。
 - アダプタを通さずに保存先へ書かない。
 - 承認されていない `changes` を `apply` に渡さない。
+- 置き場所の改名・移動・削除を依頼しない。

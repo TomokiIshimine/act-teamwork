@@ -22,7 +22,7 @@ description: ACT の保存先アダプタ（ローカルファイル）。プロ
 ├── .act/
 │   ├── project.yaml          （act-core が書く。このアダプタは読まない・書かない）
 │   └── store-localfs.json    このアダプタの記録
-├── minutes/                  議事録の原文（文字起こし）
+├── minutes/                  元の場所が無い議事録の原文（貼り付け・共有ルート外の添付）
 ├── inputs/                   入力（要望書・データなど。種類ごとのサブフォルダ）
 ├── work/                     作業途中
 ├── deliverables/             成果物（版付き）

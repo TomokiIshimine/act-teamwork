@@ -45,7 +45,7 @@ act-core（コア）は保存先を知らない。保存先への読み書きは
 
 型は `decision`、`task`、`knowledge`、`artifact_meta`、`minutes`、`run_log`、`daily_summary`、`project_registry`、`client`、`tag`、`membership`、`workflow_config`。
 
-議事録（要件 §4.6.1）は型 `minutes` で 1 会議 1 件とし、`create`・`get`・`query`・`update`・`link` で扱う。原文はアーティファクトに登録せず、属性 `transcript_location`・`transcript_hash` で指す。決定・タスクからは属性 `source_minutes` でたどる。
+議事録（要件 §4.6.1）は型 `minutes` で 1 会議 1 件とし、`create`・`get`・`query`・`update`・`link` で扱う。原文はアーティファクトに登録せず、写さずに元の場所を指す（属性 `transcript_source`・`transcript_location`・`transcript_hash`）。`put_file` の分類 `minutes` は、元の場所が無い原文（貼り付け、共有ルートの外から添付したファイル）を置くときだけ使う。決定・タスクからは属性 `source_minutes` でたどる。
 
 判断依頼は `task` の `kind: request`（`kind` は `defined`／`auxiliary`／`request`）で表し、属性 `to_role`（宛先の役割: `manager`／`business_owner`）・`request_result`（判断の結果: 承認／却下）・`affected_tasks`（影響するタスクの ID）を持つ。
 

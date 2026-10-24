@@ -9,7 +9,7 @@ description: act-core のワークフローやサブエージェントが、入�
 
 ## 呼び出し元が渡すもの
 
-- 入力テキストと出典: アーティファクトの ID と版（スレッドならその URL）。アーティファクトがまだ登録前なら、呼び出し元が決めた仮の識別子（ファイルのハッシュなど）。仮の識別子は、適用時に呼び出し元が実際の ID に置き換える。
+- 入力テキストと出典: アーティファクトの ID と版（スレッドならその URL）。議事録（型 `minutes`）から抽出するときはその ID。アーティファクトがまだ登録前なら、呼び出し元が決めた仮の識別子（ファイルのハッシュなど）。仮の識別子は、適用時に呼び出し元が実際の ID に置き換える。
 - 抽出する型: 下の「候補の型」から、そのワークフローが必要とするものだけを指定する。指定の無い型は抽出しない。
 - 対象プロジェクト: キー・名前・クライアント名（決め方は `act-core:project-resolution`）。
 - 操作者: 対象プロジェクトでのメンバーと、保存先のアカウント（ナレッジの所有者に使う）。
@@ -37,7 +37,7 @@ description: act-core のワークフローやサブエージェントが、入�
   "attributes": { "confidence": "仮説", "tags": ["プロジェクト:社内FAQ AI検証", "種類:技術知見", "話題:PDF"] },
   "narrative": { "content": "…", "evidence": "…", "caveats": "…" },
   "source": {
-    "artifact": "FAQ-ART-12", "version": "v2", "thread": null,
+    "artifact": "FAQ-ART-12", "version": "v2", "minutes": null, "thread": null,
     "position": { "page": 3, "heading": "2.1 前提", "lines": "12-15" },
     "quote": "…（入力からそのまま 1〜2 文）"
   },
@@ -50,7 +50,7 @@ description: act-core のワークフローやサブエージェントが、入�
 ```
 
 - `attributes` と `narrative` は正準モデルの項目名で書く（`act-core:store-protocol`「正準モデルの JSON」）。入力に無い値は入れない。
-- `source` は全候補に必須。`position` は分かる粒度（ページ・見出し・行、スレッドならメッセージ）で書き、`quote` は入力の文をそのまま引く。記録者・代理 AI 経由・使った設定の出典は呼び出し元が付ける。
+- `source` は全候補に必須。`artifact`・`minutes`・`thread` のうち出典に当たるものを入れる。`position` は分かる粒度（ページ・見出し・行、スレッドならメッセージ）で書き、`quote` は入力の文をそのまま引く。記録者・代理 AI 経由・使った設定の出典は呼び出し元が付ける。
 - `estimates` には、推定で埋めた値ごとの確信度と根拠を書く。確信度の基準は `act-core:write-plan`「確信度」に従う。候補全体の確信度は、その中の値の確信度のうち最も低いもの。
 - `flags` は下の型ごとの規則で付ける印。
 - `existing` は、同じ内容の既存の項目が見つかったときにその ID を入れる。新規か更新か重複かは、呼び出し元が `act-core:write-plan`「重複・差分チェック」で決める。
@@ -114,7 +114,7 @@ description: act-core のワークフローやサブエージェントが、入�
 
 ### `link`
 
-- 形: `{ "from", "to", "relation", "basis" }`。`relation` は `from` 側の正準の属性名（アーティファクトの `related_tasks`・`related_decisions`・`related_knowledge`、決定の `supersedes`、タスクの `related_decisions` など）。ナレッジの根拠のアーティファクトは、アーティファクト側の `related_knowledge` から張る。
+- 形: `{ "from", "to", "relation", "basis" }`。`relation` は `from` 側の正準の属性名（アーティファクトの `related_tasks`・`related_decisions`・`related_knowledge`、決定の `supersedes`、タスクの `related_decisions`、決定・タスクの `source_minutes`（議事録から作った候補を出典の議事録に結ぶ）など）。ナレッジの根拠のアーティファクトは、アーティファクト側の `related_knowledge` から張る。
 - 確信度: 入力に ID・URL がある → 高。名前・別名・キーワードの一致だけ → 中。弱い一致は候補にせず、`warnings` にも書かない。
 
 ## 関連の候補の探し方

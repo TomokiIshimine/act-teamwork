@@ -6,17 +6,21 @@ argument-hint: "[コマンド名や状況]"
 
 # help — act-core の使い方
 
-引数 `$ARGUMENTS` が空なら下の 3 つの表をすべて示す。コマンド名や状況が書かれていれば、該当する行だけを示す。案内だけを行い、ファイルの読み書き、設定の変更、コマンドの実行はしない。
+引数 `$ARGUMENTS` が空なら下の 3 つの表をすべて示し、「setup で決める項目の意味は `/act-core:help setup` で表示できる」と 1 行添える（このときは `act-core:setup-fields` を読まない）。コマンド名や状況が書かれていれば、該当する行だけを示す。
+
+引数が setup・初期設定・設定項目、または setup の引数（プロジェクト名、共有フォルダ、保存先の URL、プロジェクトキー、役割、クライアントなど）に当たるときは、該当する行に加えて、`Skill` ツールで `act-core:setup-fields` を読み、その「項目の一覧」と「役割の値」を表で示す。引数がスキーマ版・保存先の更新・プラグインの更新後に当たるときは、同じく `act-core:setup-fields` を読み、その「スキーマ版と保存先の更新」を示す。項目の意味の説明は `act-core:setup-fields` が正で、この案内には書かない。
+
+案内だけを行い、ファイルの読み書き、設定の変更、コマンドの実行はしない（`act-core:setup-fields` の読み込みは案内のためで、これに当たらない）。
 
 ## コマンド一覧
 
 | コマンド | いつ使う | 何をする |
 | --- | --- | --- |
-| `/act-core:setup [プロジェクト名] [共有フォルダのパス] [保存先のURL]` | 初めて使うとき、新しいプロジェクトを始める・参加するとき、既存の Notion ページを ACT 用にするとき、プラグインを更新した後 | 個人設定 `~/.act/config.yaml` にプロジェクトを 1 件追加し、保存先（Notion の DB 一式など）を新規作成・取り込み・更新する。書く前に 2 回の確認フォームで承認を取る |
+| `/act-core:setup [プロジェクト名] [共有フォルダのパス] [保存先のURL]` | 初めて使うとき、新しいプロジェクトを始める・参加するとき、既存の Notion ページを ACT 用にするとき、プラグインを更新した後 | 個人設定 `~/.act/config.yaml` にプロジェクトを 1 件追加し、保存先（Notion の DB 一式など）を新規作成・取り込み・更新する。引数で与えなかった設定は 1 項目ずつ、何に使われるかを説明しながら尋ね、書く前に変更計画フォームで承認を取る |
 | `/act-core:ingest-file <ファイルのパス…> [用途] [関連タスク] [プロジェクト]` | 資料・成果物などのファイルをプロジェクトに取り込むとき | 共有フォルダに配置しメタ情報を登録し、内容からナレッジ・決定の案・関連リンクを抽出する。議事録・文字起こしは取り込まない（C1 で扱う）。書く前に確認フォームで承認を取る |
 | `/act-core:help [コマンド名や状況]` | 使い方が分からないとき | この案内を表示する |
 
-`act-core:store-protocol`、`act-core:write-plan`、`act-core:local-files`、`act-core:project-resolution`、`act-core:context-extraction`、`act-core:permission-gate`、`act-core:workflow-config`、`act-core:artifact-placement` は、ほかのスキルとエージェントが読む規約で、直接呼ぶものではない。
+`act-core:store-protocol`、`act-core:write-plan`、`act-core:local-files`、`act-core:project-resolution`、`act-core:context-extraction`、`act-core:permission-gate`、`act-core:workflow-config`、`act-core:artifact-placement`、`act-core:setup-fields` は、ほかのスキルとエージェントが読む規約で、直接呼ぶものではない。
 
 ## 初めて使うときの流れ
 

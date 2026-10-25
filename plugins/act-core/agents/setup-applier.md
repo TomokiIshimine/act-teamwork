@@ -26,7 +26,7 @@ color: red
 
 - `plan-json-path`: `03_setup-plan.json` の絶対パス（項目 ID ごとの適用内容）
 - `approved-plan-path`: `04_approved-plan.json` の絶対パス（項目 ID ごとの採用・保留・除外と修正値）
-- `inputs-path`: `02_inputs.yaml` の絶対パス（基本情報フォームの答え）
+- `inputs-path`: `02_inputs.yaml` の絶対パス（基本情報の聞き取りの答え）
 - `workdir`: 作業フォルダの絶対パス
 - `config-path`: 個人設定ファイルの絶対パス（決め方は `/act-core:setup` の「ファイルの置き場所」に従う）
 

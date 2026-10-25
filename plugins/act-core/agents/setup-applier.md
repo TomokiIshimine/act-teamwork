@@ -56,7 +56,7 @@ color: red
 - **保存先の適用が失敗したら止める。** 失敗した段より後の項目、とくに `project.yaml` と個人設定は書かない。どこまで適用したかをログと `## 結果の要約` に残し、再実行で続きから進めることを `## 警告` に書く。
 - **権限エラーは警告にして飛ばす。** アダプタが `permission_denied` を返した項目は失敗扱いにせず、`## 警告` に載せてその項目だけ飛ばす。`conflict`（移行中など）・`not_found`・`unsupported` は失敗として扱い、上の「止める」に従う。`conflict` の `message` が ID の接頭辞の使用済みを示すときは、再実行では解消しないので、`## 警告` に接頭辞と使用元を書き、使用元の DB を直すかプロジェクトキーを変えてから再実行するよう案内する。
 - **ID の接頭辞の衝突の項目は適用しない。** `kind` が `prefix_conflict` の項目は適用する内容を持たない。この項目が `03_setup-plan.json` に 1 件でもあれば（採否にかかわらず）、段 1 以降を行わずに止め、`## 警告` に衝突した接頭辞を書く（衝突を解かないまま確定した計画で、適用すると DB の作成で止まるため）。
-- **接続先は書く前に照合する。** 保存先へ何か書く前に、書く予定のアダプタごとに読み取りだけの `inspect` で接続先（`workspace`）を確かめ、`03_setup-plan.json` 最上位の `accounts.<adapter>.workspace` と違えば何も書かずに止めて警告する（計画を作った後に接続先が切り替わっていないかの確認）。既存の個人設定に `project_key` のプロジェクトがあり `accounts.<adapter>` を持つときは、その `workspace` とも一致することを確かめ、違えば同じく止める。書く予定のアダプタの値が `accounts` に無ければ、照合できない旨を警告して止める。
+- **接続先は書く前に照合する。** 保存先へ何か書く前に、書く予定のアダプタごとに読み取りだけの `inspect` で接続先（`workspace`）を確かめ、`03_setup-plan.json` 最上位の `accounts.<adapter>.workspace` と違えば何も書かずに止めて警告する（計画を作った後に接続先が切り替わっていないかの確認）。既存の個人設定に `project_key` のプロジェクトがあり `accounts.<adapter>` を持つときは、その `workspace` とも一致することを確かめ、違えば同じく止める。ただし `localfs` の `workspace` は `root` なので、`kind` が `update_root` の項目が採用されていれば、個人設定の `accounts.localfs.workspace`（古いパス）ではなく、その項目の `payload` の `root`（新しいパス）と照合する（個人設定の値は段 6 の `root` の更新で新しいパスに書き換わる）。書く予定のアダプタの値が `accounts` に無ければ、照合できない旨を警告して止める。
 - **まだ無い DB の参照を解決する。** 項目の `payload` にある `{"store": "<型>"}` は、`/act-core:setup` の `### 03_setup-plan.json の形` の置き換え規則に従って識別子に置き換えてから使う。段 1 を飛ばしたときの `store_ids` はログの段 1 の行の `result` から読む。置き換えられなければ、その項目を書かずに止めて警告する。
 - **接続確認は段 2 の結果で判断する。** 読み取りの疎通は段 0 の `inspect` と `check_permission`（読み取り）で確かめる。書き込みの疎通は、段 2 の書き込み（プロジェクト登録・メンバー登録など）が成功したことをもってみなす。確認のためのテストページは作らない。段 2 で書くものが無かったとき（登録済みの参加など）は、読み取りの疎通だけを確かめ、書き込みは未確認と `## 結果の要約` に書く。段 2 が `permission_denied` 以外で失敗したら、それ以降（とくに設定ファイル）を書かずに止めて警告する。
 - **止まった移行の印は、採用されたときだけ外す。** `kind` が `clear_migration` の項目が採用されていれば、段 1 の最初に `clear_migration` を呼ぶ。`kind` が `clear_migration` の項目が計画にあり、その `decision` が `adopted` 以外のときは、保存先への適用（段 1〜5）は行わず、`## 警告` に印が残っていることを書いて止める。計画にその項目が無ければ、この規則は使わずに段 1 へ進む。
@@ -76,7 +76,7 @@ color: red
     # ここに payload の 1 件を入れる
   ```
 
-- **`root` の更新は、採用された 1 か所だけ。** `kind` が `update_root` の項目が採用されていれば、個人設定の該当キーの `root:` の行の値だけを、上と同じくテキストとして書き換える。ほかの行は変えない。
+- **`root` の更新は、採用された項目の該当行だけ。** `kind` が `update_root` の項目が採用されていれば、個人設定の該当キー（`payload` の `key`）の `root:` の行の値を、`payload` の `root` に、上と同じくテキストとして書き換える。そのキーが `accounts.localfs` を持つときは、その `workspace:` の行の値も同じ新しいパスに書き換える（`localfs` の `workspace` は `root` で、古いままだと次の実行の段 0 で止まるため）。ほかの行は変えない。
 
 - **役割の食い違いは警告する。** 個人設定に書く役割と、保存先のメンバー DB（Membership）の役割が違えば `## 警告` に載せる。どちらも書き換えない（権限の強制は保存先側に任せる）。
 - **ワークフロー設定は上書きしない。** 既にある同名のページは変えず、`already_applied` として記録する。既定は `act-core` 同梱の `defaults/` のファイルを、`defaults/README.md` に定める形で登録する。既定が見つからないときは、その項目を飛ばして警告する。
@@ -88,17 +88,27 @@ color: red
 1. `Skill` ツールで `act-core:store-protocol` と `act-core:local-files` を読む。
 2. `plan-json-path`・`approved-plan-path`・`inputs-path` を読み、採用された項目を抜き出す。`<workdir>/05_apply-log.jsonl` があれば読み、成功済み・既適用の項目を除く。ワークフロー設定の項目が採用されていれば、`act-core` 同梱の `defaults/README.md` も読む（段 5 の登録の形の取得元）。
 3. 次の順で適用し、1 項目ごとにログへ追記する（ログの `step` は段の番号）。段 0〜6 の意味は `/act-core:setup` の `### 03_setup-plan.json の形` に従う。ある段で「止める」に当たれば、段 7 の実行条件に当たるときは段 7 だけを行ってから手順 4 へ進み、当たらなければそのまま手順 4 へ進む。
-   0. 接続先の照合。書く予定のアダプタごとに `inspect`（読み取りのみ）を呼び、`workspace` を `03_setup-plan.json` 最上位の `accounts` と照合する。保存先には何も書かない。食い違い・照合できないときは止める。
-   1. `clear_migration` の項目が採用されていれば `clear_migration` を呼び、続けて保存先のスキーマの `apply`（`run_id` と `project_key` を渡す。移行中の印と版の記録はアダプタが扱う。実行の記録は段 7）を呼ぶ。`clear_migration` の項目が不採用なら段 1 に入らず止める。
+   0. 接続先の照合。書く予定のアダプタごとに `inspect`（読み取りのみ）を呼び、`workspace` を `03_setup-plan.json` 最上位の `accounts` と個人設定の値に、判断基準の「接続先は書く前に照合する」のとおりに照合する。保存先には何も書かない。食い違い・照合できないときは止める。
+   1. 保存先のスキーマ。
+      - 計画に `kind` が `clear_migration` の項目があるとき: 採用されていれば、最初に `clear_migration` を呼ぶ。採用されていなければ段 1 に入らず止める。
+      - 計画に `clear_migration` の項目が無いとき（通常の新規作成・更新・取り込み）は、次の `apply` から始める。
+      - 段 1 の採用された項目のうち `clear_migration`・`prefix_conflict` 以外のもの（例: `migrate_schema`・`adopt_shared`・DB の新規作成の項目）ごとに、その `payload` の `changes` と `mapping`（`override` を反映したもの）で `apply` を呼ぶ。`run_id` と `project_key` を渡す。移行中の印と版の記録はアダプタが扱う（実行の記録は段 7）。
    2. 共通一覧へのプロジェクト登録、クライアント、タグ、メンバー DB への自分の登録を、項目ごとにアダプタの操作で書く。`permission_denied` 以外で失敗すれば止める。
    3. 接続確認（`check_permission` と、判断基準の「接続確認は段 2 の結果で判断する」に従う）
-   4. 適用したスキーマ版の記録。段 1 の `apply` がこの実行またはログの段 1 の行で `success` か `already_applied` になっているときだけ行い、それ以外（参加だけの実行など）は `project.yaml` を変えずに飛ばす（保存先は `apply` の結果。`project.yaml` があればその `schema_version` を更新し、無ければ段 6 に回す）。`project.yaml` があるときは `stores` も同期する。`apply` が返した `store_ids` にあって `stores` に無い型を `{adapter, database}` の形で足す。そのアダプタの `describe` を呼び、`apply` の適用後の版が `describe` の `schema_version` と同じときだけ、`stores` にあって `describe` の `types` に無い型（例: 保存先の版が上がって廃止された型）を外す。足した型と外した型は `## 警告` ではなく `## 結果の要約` に書く。`project.yaml` が無いときは段 6 で作る
+   4. 適用したスキーマ版の記録。
+      - 実行する条件: 段 1 の `apply` がこの実行またはログの段 1 の行で `success` か `already_applied` になっているときだけ行う。当たらなければ（参加だけの実行など）`project.yaml` を変えずに飛ばす。
+      - `project.yaml` があるとき:
+        - 版の更新: `schema_version` を `apply` の結果の版（保存先側の値）で更新する。
+        - 型の追加: `apply` が返した `store_ids` にあって `stores` に無い型を `{adapter, database}` の形で足す。
+        - 型の除外: そのアダプタの `describe` を呼び、`apply` の適用後の版が `describe` の `schema_version` と同じときだけ、`stores` にあって `describe` の `types` に無い型（例: 保存先の版が上がって廃止された型）を外す。
+        - 足した型と外した型は `## 警告` ではなく `## 結果の要約` に書く。
+      - `project.yaml` が無いとき（新規プロジェクト作成）: 段 4 では書かず、段 6 に回す。
    5. ワークフロー設定の既定の登録（`defaults/README.md` の形）、または別プロジェクトからのコピー。同名のページがあれば `already_applied`。
    6. 設定ファイルへ書く。
       - `project.yaml` の作成（取り込みの `mapping` を含める） — 新規プロジェクト作成のとき
       - 既存の `project.yaml` への取り込みの `mapping` の書き込み — 取り込みを適用したとき
       - 個人設定 `projects` への 1 件追加 — 個人設定の項目が採用されたとき（新規プロジェクト作成・参加）。キーが重複すれば止める
-      - 個人設定の `root` の更新 — `update_root` の項目が採用されたとき
+      - 個人設定の `root` の更新（`accounts.localfs.workspace` を含む） — `update_root` の項目が採用されたとき
    7. 実行ログへの記録。`act-core:store-protocol` の「実行ログ」の節に従い、型 `run_log` に 1 件書く。
       - 実行する条件: 段 0 の照合を通り、保存先に書く段（1・2・5）の `success` の行が `05_apply-log.jsonl` に 1 件以上ある実行（同じ `run_id` の前回までの行を含む。途中の段で止まった場合も含む）。当たらなければ段 7 を飛ばし、そのことを `## 結果の要約` に書く。
       - 書き方: `get`（`type: run_log`、`id: <run_id>`）を呼び、`not_found` なら `create`、あれば `update`（記述は `replace`）で置き換える。

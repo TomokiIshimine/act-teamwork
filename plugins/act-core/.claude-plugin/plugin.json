@@ -1,5 +1,5 @@
 {
   "name": "act-core",
-  "version": "0.5.0",
-  "description": "ACTモデルのコアプラグイン。プロジェクトへの参加と保存先の初期設定（setup）、保存先アダプタの呼び出し規約（store-protocol）、書き込み計画と確認フォームの規約（write-plan）、設定ファイルと作業フォルダの読み書きの規約（local-files）を含む。ファイル取り込み（ingest-file。資料・成果物を共有フォルダのテーマ別の置き場所に整理し、メタ情報の登録とナレッジ・決定の案・関連リンクの抽出を行う）と、5 本の共通エンジン（プロジェクトの特定 project-resolution、文脈の抽出 context-extraction、権限の判定 permission-gate、ワークフロー設定 workflow-config、置き場所の選定 artifact-placement）も含む。保存先への読み書きには act-store-notion などのアダプタが別に要る。"
+  "version": "0.6.0",
+  "description": "ACTモデルのコアプラグイン。プロジェクトへの参加と保存先の初期設定（setup。引数で与えなかった設定は 1 項目ずつ説明つきで尋ねる）と、その設定項目の説明（setup-fields）、保存先アダプタの呼び出し規約（store-protocol）、書き込み計画と確認フォームの規約（write-plan）、設定ファイルと作業フォルダの読み書きの規約（local-files）を含む。ファイル取り込み（ingest-file。資料・成果物を共有フォルダのテーマ別の置き場所に整理し、メタ情報の登録とナレッジ・決定の案・関連リンクの抽出を行う）と、5 本の共通エンジン（プロジェクトの特定 project-resolution、文脈の抽出 context-extraction、権限の判定 permission-gate、ワークフロー設定 workflow-config、置き場所の選定 artifact-placement）も含む。保存先への読み書きには act-store-notion などのアダプタが別に要る。"
 }
